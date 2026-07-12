@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام متابعة غياب المتدربين</title>
+    
+    <!-- إضافة Favicon مخصص بلون المؤسسة (Teal) -->
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334c2b4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E" type="image/svg+xml">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
@@ -102,7 +106,6 @@
                 م. محمد يوسف الشبيلي
             </div>
         </div>
-        <!-- تم إزالة زر رفع البيانات من هنا -->
         <div class="_navItem" id="nav-main" onclick="switchTab('report-main', this)">المتدربون (الرئيسي)</div>
         <div class="_navItem" onclick="switchTab('report-matrix', this)">مصفوفة الغياب</div>
         <div class="_navItem" onclick="switchTab('report-percentages', this)">نسبة الغياب والإنذارات</div>
@@ -124,7 +127,6 @@
                 <label style="margin-right: 15px;">عدد أسابيع الفصل:</label>
                 <input type="number" id="totalWeeks" class="input-number" value="18" onchange="processData()">
                 
-                <!-- زر رفع البيانات الجديد (أيقونة Lucide: folder-up) -->
                 <button class="btn-upload" onclick="switchTab('upload', null, 'رفع البيانات')">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3-3 3 3"/></svg>
                     رفع البيانات
@@ -204,12 +206,10 @@
     var courseHours = {}; 
     var isFemale = false; 
 
-    // تحديث دالة التنقل بين التبويبات للتعامل مع الزر العلوي والقائمة الجانبية معاً
     window.switchTab = function(tabId, el, titleOverride) {
         document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
         document.getElementById(tabId).classList.remove('hidden');
         
-        // إزالة التحديد من جميع عناصر القائمة الجانبية
         document.querySelectorAll('._navItem').forEach(e => e.classList.remove('active'));
         
         if (el) {
@@ -267,7 +267,6 @@
         return p;
     };
     
-    // دالة البحث وتصفية الجداول الفورية
     window.filterTables = function() {
         let input = document.getElementById('searchInput');
         let filter = input.value.trim().toLowerCase();
@@ -326,7 +325,7 @@
 
         let activeTab = document.querySelector('._navItem.active');
         if (activeTab && activeTab.id !== 'nav-main' && activeTab.id !== 'nav-excluded') {
-            // تجاهل العناوين الثابتة
+            
         } else if (activeTab) {
             document.getElementById('pageTitle').innerText = activeTab.innerText;
         }
@@ -377,7 +376,6 @@
             }
         });
 
-        // 1. حساب المحاضرات الملقاة بناء على SO04 (مع دمج التكرارات لمعالجة تحديثات رايات)
         let globalSessionStatus = {}; 
         rawData.so04.forEach(row => {
             let crn = row['الرقم المرجعي'];
@@ -393,7 +391,6 @@
             if(!globalSessionStatus[crn]) globalSessionStatus[crn] = {};
             if(!globalSessionStatus[crn][weekNum]) globalSessionStatus[crn][weekNum] = {};
             
-            // هذا السطر يضمن أخذ آخر حالة للمحاضرة (لو تغيرت من بدون عذر إلى جلسة ملغاة سيأخذ الملغاة)
             globalSessionStatus[crn][weekNum][sessionKey] = {
                 absHours: Math.max((globalSessionStatus[crn][weekNum][sessionKey]?.absHours || 0), absHours),
                 excuse: excuse 
@@ -467,7 +464,6 @@
             }
         });
 
-        // 2. حساب الغياب لكل متدرب (مع دمج تكرارات تقرير SO04 بدقة)
         let traineeSessionStatus = {}; 
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'] || row['رقم المتدربة'];
@@ -488,11 +484,10 @@
             traineeSessionStatus[id][crn][sessionKey] = {
                 weekNum: weekNum,
                 absHours: Math.max((traineeSessionStatus[id][crn][sessionKey]?.absHours || 0), absHours),
-                excuse: excuse // الاعتماد على حالة العذر في التحديث الأخير
+                excuse: excuse
             };
         });
 
-        // 3. تفريغ وتصنيف الغياب النهائي للمتدرب
         Object.keys(traineeSessionStatus).forEach(id => {
             Object.keys(traineeSessionStatus[id]).forEach(crn => {
                 Object.keys(traineeSessionStatus[id][crn]).forEach(sessionKey => {
@@ -656,13 +651,11 @@
             return html;
         };
 
-        // 1. الرئيسي
         let htmlMain = `<table>${createThead(false)}<tbody>`;
         processedData.active.forEach(t => htmlMain += createRow(t, false));
         htmlMain += `</tbody></table>`;
         document.getElementById('table-main').innerHTML = htmlMain;
 
-        // 2. مصفوفة الغياب
         let htmlMatrix = `<table><thead><tr>
             <th class="nowrap">${colId}</th>
             <th class="nowrap name-cell">${colName}</th>
@@ -702,31 +695,26 @@
         htmlMatrix += `</tbody></table>`;
         document.getElementById('table-matrix').innerHTML = htmlMatrix;
 
-        // 3. غياب أسبوع كامل فأكثر
         let htmlFull = `<table>${createThead(false)}<tbody>`;
         processedData.active.filter(t => Object.values(t.weekStatuses).includes('كامل')).forEach(t => htmlFull += createRow(t, false));
         htmlFull += `</tbody></table>`;
         document.getElementById('table-fullweek').innerHTML = htmlFull;
 
-        // 4. محروم بكل المقررات
         let htmlDepAll = `<table>${createThead(false)}<tbody>`;
         processedData.active.filter(t => t.totalUniqueCourses > 0 && t.totalDeprivedCourses === t.totalUniqueCourses).forEach(t => htmlDepAll += createRow(t, false));
         htmlDepAll += `</tbody></table>`;
         document.getElementById('table-deprived-all').innerHTML = htmlDepAll;
 
-        // 5. محروم ماعدا مقرر
         let htmlDepExc = `<table>${createThead(false)}<tbody>`;
         processedData.active.filter(t => t.totalUniqueCourses > 1 && t.totalDeprivedCourses === (t.totalUniqueCourses - 1)).forEach(t => htmlDepExc += createRow(t, false));
         htmlDepExc += `</tbody></table>`;
         document.getElementById('table-deprived-except').innerHTML = htmlDepExc;
 
-        // 6. المنسحبين والمطوي قيدهم 
         let htmlExc = `<table>${createThead(true)}<tbody>`;
         processedData.excluded.forEach(t => htmlExc += createRow(t, true));
         htmlExc += `</tbody></table>`;
         document.getElementById('table-excluded').innerHTML = htmlExc;
 
-        // 7. صفحة النسبة
         let htmlPerc = `<table><thead><tr>
             <th class="nowrap">${colId}</th>
             <th class="nowrap name-cell">${colName}</th>
@@ -782,7 +770,6 @@
         window.filterTables();
     };
 
-    // تشغيل صفحة رفع البيانات كوضع افتراضي عند فتح النظام
     window.switchTab('upload', null, 'رفع البيانات');
 </script>
 </body>
