@@ -179,37 +179,38 @@
 
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
 
-        // 1. حساب الساعات النظرية من SS01
+        // 1. حساب الساعات المجدولة بشكل دقيق جداً (بالاعتماد على الأيام والأوقات لجمع المحاضرات المتعددة)
         courseHours = {};
-        let crnDays = {}; 
+        let crnUniqueSessions = {}; 
         
+        // المرور الأول: جمع الأوقات الفعلية (يحل مشكلة الشعب التي تدرس في يومين مثل 567)
         rawData.ss01.forEach(row => {
             let crn = row['الرقم المرجعي'] || row['CRN'];
-            let contactHoursCol = row['ساعات الاتصال'];
             let time = row['الوقت'] || row['فترة المحاضرة'];
             let day = row['اليوم'] || '';
             
-            if (crn) {
-                if (contactHoursCol !== undefined && contactHoursCol !== "") {
-                    let h = parseFloat(contactHoursCol);
-                    if (!courseHours[crn] || h > courseHours[crn]) {
-                        courseHours[crn] = h;
-                    }
-                } 
-                else if (time) {
-                    let uniqueKey = day + time;
-                    if (!crnDays[crn]) crnDays[crn] = new Set();
-                    
-                    if (!crnDays[crn].has(uniqueKey)) {
-                        crnDays[crn].add(uniqueKey);
-                        let h = calculateContactHours(time);
-                        courseHours[crn] = (courseHours[crn] || 0) + h;
-                    }
+            if (crn && time && day) {
+                let uniqueKey = day.trim() + '_' + time.trim();
+                if (!crnUniqueSessions[crn]) crnUniqueSessions[crn] = new Set();
+                
+                if (!crnUniqueSessions[crn].has(uniqueKey)) {
+                    crnUniqueSessions[crn].add(uniqueKey);
+                    let h = calculateContactHours(time);
+                    courseHours[crn] = (courseHours[crn] || 0) + h;
                 }
             }
         });
 
-        // 2. الخوارزمية الجديدة: حساب الساعات الفعلية (TTH) لكل شعبة أسبوعياً بناءً على تقرير الغياب!
+        // المرور الثاني: إذا لم يكن هناك أوقات (جدول غير مكتمل)، نعتمد على عمود ساعات الاتصال كحل بديل
+        rawData.ss01.forEach(row => {
+            let crn = row['الرقم المرجعي'] || row['CRN'];
+            let contactHoursCol = row['ساعات الاتصال'];
+            if (crn && !courseHours[crn] && contactHoursCol !== undefined && contactHoursCol !== "") {
+                courseHours[crn] = parseFloat(contactHoursCol);
+            }
+        });
+
+        // 2. حساب الساعات الفعلية المنفذة (TTH) لكل شعبة للاحتياط
         let crnWeekSessions = {}; 
         rawData.so04.forEach(row => {
             let crn = row['الرقم المرجعي'];
@@ -220,30 +221,27 @@
             let excuse = row['نوع العذر'] || '';
             
             if(!crn || isNaN(weekNum) || absHours <= 0) return;
-            if(excuse.includes('جلسة ملغاة')) return; // تجاهل الجلسات الملغاة تماماً
+            if(excuse.includes('جلسة ملغاة')) return; 
 
             if(!crnWeekSessions[weekNum]) crnWeekSessions[weekNum] = {};
             if(!crnWeekSessions[weekNum][crn]) crnWeekSessions[weekNum][crn] = {};
             
             let sessionKey = date + '_' + time;
             let currentMax = crnWeekSessions[weekNum][crn][sessionKey] || 0;
-            // نأخذ الحد الأقصى لساعات الغياب المسجلة لتلك الجلسة كإثبات لطولها الفعلي
             crnWeekSessions[weekNum][crn][sessionKey] = Math.max(currentMax, absHours);
         });
 
-        let TTH = {}; // Total Taught Hours (الساعات التي أقيمت فعلياً)
+        let TTH = {}; 
         for(let w in crnWeekSessions) {
             TTH[w] = {};
             for(let c in crnWeekSessions[w]) {
                 let sum = 0;
-                for(let key in crnWeekSessions[w][c]) {
-                    sum += crnWeekSessions[w][c][key];
-                }
+                for(let key in crnWeekSessions[w][c]) sum += crnWeekSessions[w][c][key];
                 TTH[w][c] = sum;
             }
         }
 
-        // 3. تجهيز بيانات المتدربين من SF01
+        // 3. بناء هيكل المتدربين
         let traineesMap = {};
         rawData.sf01.forEach(row => {
             let id = row['رقم المتدرب'];
@@ -274,7 +272,6 @@
             let crn = row['الرقم المرجعي'];
             let courseCode = row['المقرر'];
             let courseName = row['اسم المقرر'] || row['عنوان المقرر'];
-
             let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي');
             let isDeprived = (grade === 'ح'); 
 
@@ -287,7 +284,7 @@
                         code: courseCode,
                         name: courseName,
                         hours: ch,
-                        absHours: 0, // للنسبة المئوية (بدون عذر)
+                        absHours: 0,
                         isOfficiallyDeprived: isDeprived
                     };
                 } else if (isDeprived) {
@@ -296,7 +293,7 @@
             }
         });
 
-        // 4. معالجة الغياب
+        // 4. معالجة بيانات الغياب والجلسات الملغاة
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'];
             let crn = row['الرقم المرجعي'];
@@ -306,25 +303,22 @@
             
             if(!traineesMap[id] || !traineesMap[id].crns[crn] || isNaN(weekNum) || absHours === 0) return;
             
-            if(excuse.includes('جلسة ملغاة')) return; // لا نحتسب الجلسة الملغاة على المتدرب
-
-            if(excuse.includes('بدون عذر')) {
-                traineesMap[id].crns[crn].absHours += absHours;
-            }
-
             if(!traineesMap[id].weeklyCrnAbsences[weekNum]) {
                 traineesMap[id].weeklyCrnAbsences[weekNum] = {};
             }
             if(!traineesMap[id].weeklyCrnAbsences[weekNum][crn]) {
-                traineesMap[id].weeklyCrnAbsences[weekNum][crn] = { unexcusedAbs: 0 };
+                traineesMap[id].weeklyCrnAbsences[weekNum][crn] = { unexcusedAbs: 0, canceledAbs: 0 };
             }
-            
+
             if(excuse.includes('بدون عذر')) {
+                traineesMap[id].crns[crn].absHours += absHours; // للنسب الإجمالية
                 traineesMap[id].weeklyCrnAbsences[weekNum][crn].unexcusedAbs += absHours;
+            } else if (excuse.includes('جلسة ملغاة')) {
+                traineesMap[id].weeklyCrnAbsences[weekNum][crn].canceledAbs += absHours;
             }
         });
 
-        // 5. التصنيف وحساب الحرمان والأسابيع
+        // 5. التصنيف النهائي
         processedData.active = [];
         processedData.excluded = [];
         processedData.percentages = [];
@@ -344,22 +338,14 @@
                 let crnData = t.crns[crn];
                 let totalCrnHours = crnData.hours * totalWeeks;
                 
-                if (crnData.isOfficiallyDeprived) {
-                    t.deprivedCourseCodes.add(crnData.code);
-                }
-
+                if (crnData.isOfficiallyDeprived) t.deprivedCourseCodes.add(crnData.code);
                 crnData.absPercentage = totalCrnHours > 0 ? (crnData.absHours / totalCrnHours) * 100 : 0;
 
                 if(crnData.absPercentage > 0) {
                     processedData.percentages.push({
-                        traineeName: t.name,
-                        traineeId: t.id,
-                        phone: t.phone,
-                        courseCode: crnData.code,
-                        courseName: crnData.name,
-                        crn: crn,
-                        absPercentage: crnData.absPercentage,
-                        isDeprived: crnData.isOfficiallyDeprived
+                        traineeName: t.name, traineeId: t.id, phone: t.phone,
+                        courseCode: crnData.code, courseName: crnData.name, crn: crn,
+                        absPercentage: crnData.absPercentage, isDeprived: crnData.isOfficiallyDeprived
                     });
                 }
             });
@@ -380,25 +366,21 @@
                     let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0;
                     let scheduleHours = t.crns[crn].hours || 0;
                     
-                    // نعتبر المقرر متوقعاً إذا تم التحضير فيه (taughtHours) أو مسجّل له ساعات بالجدول
-                    if (taughtHours > 0 || scheduleHours > 0) {
-                        expectedCrnsCount++;
-                    }
-                    if (taughtHours > 0) {
-                        anyTrainerTaught = true;
-                    }
-
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
                     let unexcusedAbs = wData ? wData.unexcusedAbs : 0;
-                    
+                    let canceledAbs = wData ? wData.canceledAbs : 0;
+
+                    // تحديد الساعات المطلوبة من المتدرب (تعتمد على الجدول أولاً، ونخصم منها الملغى)
+                    let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours;
+                    let expectedHours = Math.max(0, baseHours - canceledAbs);
+
+                    if (expectedHours > 0 || taughtHours > 0) expectedCrnsCount++;
+                    if (taughtHours > 0) anyTrainerTaught = true;
+
                     if (unexcusedAbs > 0) {
                         absentCrnsCount++;
-                        
-                        // نعتمد على الساعات التي "أقيمت فعلياً" كمرجع أول، وإلا نعود للجدول
-                        let maxExpectedHours = taughtHours > 0 ? taughtHours : scheduleHours;
-                        
-                        // إذا كان الغياب يغطي 100% من الساعات الفعلية، فهو غياب كامل عن هذا المقرر
-                        if (maxExpectedHours === 0 || unexcusedAbs >= maxExpectedHours) {
+                        // يعتبر غائباً كلياً عن هذا المقرر إذا كانت ساعات غيابه تساوي أو تتجاوز الساعات المطلوبة فعلياً
+                        if (expectedHours === 0 || unexcusedAbs >= expectedHours) {
                             fullyAbsentCrnsCount++;
                         }
                     }
@@ -407,8 +389,8 @@
                 if (expectedCrnsCount === 0) {
                     t.weekStatuses[w] = "-";
                 } else if (absentCrnsCount > 0) {
-                    // يحصل على "كامل" فقط إذا غاب غياباً تاماً عن جميع المقررات المتوقعة
-                    if (fullyAbsentCrnsCount === expectedCrnsCount) {
+                    // يجب أن يغيب كلياً عن *جميع* المقررات المطلوبة منه في هذا الأسبوع ليحصل على "كامل"
+                    if (fullyAbsentCrnsCount > 0 && fullyAbsentCrnsCount === expectedCrnsCount) {
                         t.weekStatuses[w] = "كامل";
                         t.weeksAbsentCount++;
                     } else {
@@ -421,7 +403,6 @@
                     t.weekStatuses[w] = "محتمل";
                 }
             }
-
             processedData.active.push(t);
         });
 
