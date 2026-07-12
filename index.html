@@ -266,7 +266,7 @@
                     traineeStatus: traineeStatus,
                     crns: {}, 
                     courseCodes: new Set(), 
-                    weeklyCrnAbsences: {}, // weekNum -> crn -> { absHours, hasUnexcused }
+                    weeklyCrnAbsences: {}, 
                     weekStatuses: {}, 
                     weeksAbsentCount: 0,
                     totalUniqueCourses: 0,
@@ -378,41 +378,42 @@
 
             t.weeksAbsentCount = 0;
             
-            // حساب حالة الأسابيع (المنطق الذكي المعتمد على الشعب الفعلية)
+            // حساب حالة الأسابيع (المنطق الذكي المعتمد على عدد الشُعب)
             let activeCrns = Object.keys(t.crns);
+            let totalCoursesCount = activeCrns.length; // إجمالي الشُعب المسجلة للمتدرب
 
             for(let w=1; w<=totalWeeks; w++) {
-                let taughtCount = 0;
-                let absentCount = 0;
-                let presentCount = 0;
+                let absentCrnsCount = 0;
+                let trainerTaughtCount = 0;
 
                 activeCrns.forEach(crn => {
                     let trainerTaught = crnHasData[crn] && crnHasData[crn][w];
                     if (trainerTaught) {
-                        taughtCount++;
-                        let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
-                        // إذا كان هناك غياب مسجل وبدون عذر
-                        if (wData && wData.absHours > 0 && wData.hasUnexcused) {
-                            absentCount++;
-                        } else {
-                            presentCount++;
-                        }
+                        trainerTaughtCount++;
+                    }
+
+                    let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
+                    if (wData && wData.absHours > 0 && wData.hasUnexcused) {
+                        absentCrnsCount++;
                     }
                 });
 
-                if (taughtCount === 0) {
-                    t.weekStatuses[w] = "محتمل";
-                } else if (presentCount === 0 && absentCount > 0) {
-                    // تم تدريس بعض الشعب، والمتدرب غاب فيها كلها
+                if (totalCoursesCount === 0) {
+                    t.weekStatuses[w] = "-";
+                } else if (absentCrnsCount === totalCoursesCount) {
+                    // غاب في جميع الشُعب المسجلة له
                     t.weekStatuses[w] = "كامل";
                     t.weeksAbsentCount++;
-                } else if (absentCount > 0) {
-                    // تم تدريس بعض الشعب، والمتدرب غاب في بعضها وحضر البعض
+                } else if (absentCrnsCount > 0) {
+                    // غاب في بعض الشُعب وليس كلها
                     t.weekStatuses[w] = "جزئي";
                     t.weeksAbsentCount++;
-                } else {
-                    // تم تدريس بعض الشعب، والمتدرب حضرها كلها
+                } else if (trainerTaughtCount > 0) {
+                    // لم يغب، وهناك مدرب واحد على الأقل قام بالتحضير
                     t.weekStatuses[w] = "-"; 
+                } else {
+                    // لم يغب، ولم يقم أي مدرب بالتحضير
+                    t.weekStatuses[w] = "محتمل";
                 }
             }
 
