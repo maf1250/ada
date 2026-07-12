@@ -121,7 +121,6 @@
     let processedData = { active: [], excluded: [], percentages: [] };
     let courseHours = {}; 
     let crnHasData = {}; 
-    let semesterStartDay = 0; 
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -163,16 +162,6 @@
         
         let diff = Math.abs(toMins(t1) - toMins(t2));
         return Math.round(diff / 50); 
-    }
-
-    function parseHijriToDays(dateStr) {
-        if(!dateStr) return 99999999;
-        let parts = dateStr.split('/');
-        if(parts.length !== 3) return 99999999;
-        let d = parseInt(parts[0], 10);
-        let m = parseInt(parts[1], 10);
-        let y = parseInt(parts[2], 10);
-        return Math.floor(y * 354.36 + m * 29.53 + d);
     }
 
     function formatPhone(phone) {
@@ -221,32 +210,19 @@
             }
         });
 
-        // 2. تحديد بداية الفصل من SO04
-        let minDay = 99999999;
-        rawData.so04.forEach(row => {
-            let dateStr = row['تاريخ المحاضرة'] || row['تاريخ العملية'];
-            let dayNum = parseHijriToDays(dateStr);
-            if(dayNum < minDay) minDay = dayNum;
-        });
-        semesterStartDay = minDay;
-
-        // 3. بناء سجل تحضير المدربين
+        // 2. بناء سجل تحضير المدربين (بالاعتماد على عمود رقم الأسبوع مباشرة)
         crnHasData = {};
         rawData.so04.forEach(row => {
             let crn = row['الرقم المرجعي'];
-            let dateStr = row['تاريخ المحاضرة'];
-            if(!crn || !dateStr) return;
-
-            let dayNum = parseHijriToDays(dateStr);
-            let weekNum = Math.floor((dayNum - semesterStartDay) / 7) + 1;
-            if(weekNum < 1) weekNum = 1;
-            if(weekNum > totalWeeks) weekNum = totalWeeks;
+            let weekNum = parseInt(row['رقم الأسبوع']);
+            
+            if(!crn || isNaN(weekNum)) return;
 
             if(!crnHasData[crn]) crnHasData[crn] = {};
             crnHasData[crn][weekNum] = true; 
         });
 
-        // 4. تجهيز بيانات المتدربين من SF01
+        // 3. تجهيز بيانات المتدربين من SF01
         let traineesMap = {};
         rawData.sf01.forEach(row => {
             let id = row['رقم المتدرب'];
@@ -299,20 +275,15 @@
             }
         });
 
-        // 5. معالجة الغياب من SO04
+        // 4. معالجة الغياب من SO04 (بالاعتماد على عمود رقم الأسبوع مباشرة)
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'];
             let crn = row['الرقم المرجعي'];
-            let dateStr = row['تاريخ المحاضرة'];
+            let weekNum = parseInt(row['رقم الأسبوع']);
             let absHours = parseFloat(row['ساعات الغياب']) || 0;
             let excuse = row['نوع العذر'] || '';
             
-            if(!traineesMap[id] || !traineesMap[id].crns[crn] || absHours === 0) return;
-
-            let dayNum = parseHijriToDays(dateStr);
-            let weekNum = Math.floor((dayNum - semesterStartDay) / 7) + 1;
-            if(weekNum < 1) weekNum = 1;
-            if(weekNum > totalWeeks) weekNum = totalWeeks;
+            if(!traineesMap[id] || !traineesMap[id].crns[crn] || absHours === 0 || isNaN(weekNum)) return;
 
             if(excuse.includes('بدون عذر')) {
                 traineesMap[id].crns[crn].absHours += absHours;
@@ -331,7 +302,7 @@
             }
         });
 
-        // 6. تصنيف المتدربين وحساب الحرمان
+        // 5. تصنيف المتدربين وحساب الحرمان
         processedData.active = [];
         processedData.excluded = [];
         processedData.percentages = [];
@@ -378,37 +349,39 @@
 
             t.weeksAbsentCount = 0;
             
-            // حساب حالة الأسابيع (المنطق الذكي المعتمد على عدد الشُعب)
+            // حساب حالة الأسابيع (المنطق الذكي المعتمد على إجمالي الشُعب المسجلة)
             let activeCrns = Object.keys(t.crns);
             let totalCoursesCount = activeCrns.length; // إجمالي الشُعب المسجلة للمتدرب
 
             for(let w=1; w<=totalWeeks; w++) {
                 let absentCrnsCount = 0;
-                let trainerTaughtCount = 0;
+                let presentCrnsCount = 0;
+                let probableCrnsCount = 0;
 
                 activeCrns.forEach(crn => {
                     let trainerTaught = crnHasData[crn] && crnHasData[crn][w];
-                    if (trainerTaught) {
-                        trainerTaughtCount++;
-                    }
-
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
+                    
                     if (wData && wData.absHours > 0 && wData.hasUnexcused) {
-                        absentCrnsCount++;
+                        absentCrnsCount++; // غاب بدون عذر
+                    } else if (trainerTaught) {
+                        presentCrnsCount++; // المدرب حضّر، والمتدرب لم يغب
+                    } else {
+                        probableCrnsCount++; // المدرب لم يحضّر
                     }
                 });
 
                 if (totalCoursesCount === 0) {
                     t.weekStatuses[w] = "-";
                 } else if (absentCrnsCount === totalCoursesCount) {
-                    // غاب في جميع الشُعب المسجلة له
+                    // غاب في جميع الشُعب المسجلة له (حتى لو بعضها لم يُدرس)
                     t.weekStatuses[w] = "كامل";
                     t.weeksAbsentCount++;
                 } else if (absentCrnsCount > 0) {
                     // غاب في بعض الشُعب وليس كلها
                     t.weekStatuses[w] = "جزئي";
                     t.weeksAbsentCount++;
-                } else if (trainerTaughtCount > 0) {
+                } else if (presentCrnsCount > 0) {
                     // لم يغب، وهناك مدرب واحد على الأقل قام بالتحضير
                     t.weekStatuses[w] = "-"; 
                 } else {
