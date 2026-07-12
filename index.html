@@ -32,6 +32,9 @@
         ._dropZone p { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
         input[type="file"] { display: none; }
         
+        .btn-primary { background: var(--primary); color: #fff; border: none; padding: var(--sp-2) var(--sp-4); border-radius: var(--radius-sm); font-family: inherit; font-weight: 700; cursor: pointer; transition: all var(--dur) var(--ease); }
+        .btn-primary:hover { background: var(--primary-hover); }
+        
         .btn-whatsapp { background: #25D366; color: #fff; border: none; padding: 6px 16px; border-radius: var(--radius-full); font-family: inherit; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all var(--dur) var(--ease); }
         .btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
 
@@ -63,13 +66,13 @@
         <div style="padding: 0 var(--sp-4) var(--sp-4); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-2);">
             <h2 style="margin: 0; color: var(--primary); font-size: var(--fs-lg);">نظام الغياب الذكي</h2>
         </div>
-        <div class="_navItem active" onclick="switchTab('upload')">رفع البيانات</div>
-        <div class="_navItem" onclick="switchTab('report-main')">المتدربون (الرئيسي)</div>
-        <div class="_navItem" onclick="switchTab('report-percentages')">نسبة الغياب والإنذارات</div>
-        <div class="_navItem" onclick="switchTab('report-fullweek')">غياب أسبوع كامل فأكثر</div>
-        <div class="_navItem" onclick="switchTab('report-deprived-all')">محروم بكل المقررات</div>
-        <div class="_navItem" onclick="switchTab('report-deprived-except')">محروم ماعدا مقرر</div>
-        <div class="_navItem" onclick="switchTab('report-excluded')">المنسحبين والمطوي قيدهم</div>
+        <div class="_navItem active" onclick="switchTab('upload', this)">رفع البيانات</div>
+        <div class="_navItem" id="nav-main" onclick="switchTab('report-main', this)">المتدربون (الرئيسي)</div>
+        <div class="_navItem" onclick="switchTab('report-percentages', this)">نسبة الغياب والإنذارات</div>
+        <div class="_navItem" onclick="switchTab('report-fullweek', this)">غياب أسبوع كامل فأكثر</div>
+        <div class="_navItem" onclick="switchTab('report-deprived-all', this)">محروم بكل المقررات</div>
+        <div class="_navItem" onclick="switchTab('report-deprived-except', this)">محروم ماعدا مقرر</div>
+        <div class="_navItem" id="nav-excluded" onclick="switchTab('report-excluded', this)">المنسحبين والمطوي قيدهم</div>
     </div>
 
     <div class="_main">
@@ -87,7 +90,7 @@
                 <div class="_uploadGrid">
                     <div class="_dropZone" id="drop-sf01" onclick="document.getElementById('file-sf01').click()">
                         <h3>تقرير SF01</h3>
-                        <p>قائمة المتدربين المسجلين</p>
+                        <p id="desc-sf01">قائمة المتدربين المسجلين</p>
                         <input type="file" id="file-sf01" accept=".xls,.xlsx,.csv" onchange="handleFile(event, 'sf01')">
                     </div>
                     <div class="_dropZone" id="drop-ss01" onclick="document.getElementById('file-ss01').click()">
@@ -117,20 +120,28 @@
     let rawData = { sf01: [], ss01: [], so04: [] };
     let processedData = { active: [], excluded: [], percentages: [] };
     let courseHours = {}; 
+    let isFemale = false; // متغير لتحديد نوع الوحدة (بنات/بنين)
 
-    function switchTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    function switchTab(tabId, el) {
+        document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
         document.getElementById(tabId).classList.remove('hidden');
-        document.querySelectorAll('._navItem').forEach(el => el.classList.remove('active'));
-        event.currentTarget.classList.add('active');
-        document.getElementById('pageTitle').innerText = event.currentTarget.innerText;
+        document.querySelectorAll('._navItem').forEach(e => e.classList.remove('active'));
+        if (el) {
+            el.classList.add('active');
+            document.getElementById('pageTitle').innerText = el.innerText;
+        }
     }
 
     function handleFile(e, type) {
         const file = e.target.files[0];
         if (!file) return;
-        document.getElementById(`drop-${type}`).classList.add('has-file');
-        document.getElementById(`drop-${type}`).querySelector('p').innerText = file.name;
+        
+        let dropZone = document.getElementById(`drop-${type}`);
+        dropZone.classList.add('has-file');
+        
+        // الحفاظ على النص الخاص بالوصف عند عرض اسم الملف
+        let pEl = dropZone.querySelector('p');
+        pEl.innerText = file.name;
 
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -170,12 +181,34 @@
         if(p.startsWith('5')) return '966' + p;
         return p;
     }
+    
+    function updateUIText() {
+        // تحديث النصوص بناءً على نوع الوحدة (بنات أو بنين)
+        document.getElementById('nav-main').innerText = isFemale ? 'المتدربات (الرئيسي)' : 'المتدربون (الرئيسي)';
+        document.getElementById('nav-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبين والمطوي قيدهم';
+        
+        let activeTab = document.querySelector('._navItem.active');
+        if (activeTab) {
+            document.getElementById('pageTitle').innerText = activeTab.innerText;
+        }
+    }
 
     function processData() {
         // إيقاف المعالجة بصمت إذا لم يتم رفع جميع الملفات بعد
         if (rawData.sf01.length === 0 || rawData.ss01.length === 0 || rawData.so04.length === 0) {
             return;
         }
+
+        // الكشف عن جنس الوحدة (بنات أم لا) من جدول SS01
+        isFemale = false;
+        for (let i = 0; i < rawData.ss01.length; i++) {
+            let unitName = rawData.ss01[i]['الوحدة التدريبية'] || rawData.ss01[i]['الوحدة'] || '';
+            if (unitName.includes('بنات')) {
+                isFemale = true;
+                break;
+            }
+        }
+        updateUIText();
 
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
 
@@ -239,17 +272,19 @@
 
         let traineesMap = {};
         rawData.sf01.forEach(row => {
-            let id = row['رقم المتدرب'];
+            // دعم لقراءة الأعمدة سواء كانت مسماة للمذكر أو المؤنث
+            let id = row['رقم المتدرب'] || row['رقم المتدربة'];
             if(!id) return;
             
+            let name = row['إسم المتدرب'] || row['اسم المتدرب'] || row['إسم المتدربة'] || row['اسم المتدربة'];
             let regStatus = row['حالة تسجيل'] || '';
-            let traineeStatus = row['حالة المتدرب'] || '';
+            let traineeStatus = row['حالة المتدرب'] || row['حالة المتدربة'] || '';
             let grade = row['الدرجة'] ? row['الدرجة'].toString().trim() : ''; 
             
             if(!traineesMap[id]) {
                 traineesMap[id] = {
                     id: id,
-                    name: row['إسم المتدرب'] || row['اسم المتدرب'],
+                    name: name,
                     major: row['التخصص'],
                     phone: row['رقم الجوال'],
                     regStatus: regStatus,
@@ -289,7 +324,7 @@
         });
 
         rawData.so04.forEach(row => {
-            let id = row['رقم المتدرب'];
+            let id = row['رقم المتدرب'] || row['رقم المتدربة'];
             let crn = row['الرقم المرجعي'];
             let weekNum = parseInt(row['رقم الأسبوع']);
             let absHours = parseFloat(row['ساعات الغياب']) || 0;
@@ -402,9 +437,12 @@
 
     function renderTables(totalWeeks) {
         const createThead = () => {
+            let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب';
+            let colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب';
+            
             let html = `<thead><tr>
-                <th>رقم المتدرب</th>
-                <th>اسم المتدرب</th>
+                <th>${colId}</th>
+                <th>${colName}</th>
                 <th>التخصص</th>
                 <th>رقم الجوال</th>
                 <th>عدد المقررات</th>
@@ -468,8 +506,8 @@
         document.getElementById('table-excluded').innerHTML = htmlExc;
 
         let htmlPerc = `<table><thead><tr>
-            <th>رقم المتدرب</th>
-            <th>اسم المتدرب</th>
+            <th>${isFemale ? 'رقم المتدربة' : 'رقم المتدرب'}</th>
+            <th>${isFemale ? 'اسم المتدربة' : 'اسم المتدرب'}</th>
             <th>رمز المقرر</th>
             <th>اسم المقرر</th>
             <th>الشعبة (CRN)</th>
@@ -480,12 +518,19 @@
         
         processedData.percentages.forEach(p => {
             let formattedPhone = formatPhone(p.phone);
-            let msg = `عزيزي ${p.traineeName}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابك في مقرر \n${p.courseName}\n هي ${p.absPercentage.toFixed(1)}% \nلذا نأمل منك الانتباه والحرص على عدم الغياب`;
+            
+            // تخصيص رسالة الواتساب حسب نوع الوحدة
+            let msg = isFemale 
+                ? `عزيزتي ${p.traineeName}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابكِ في مقرر \n${p.courseName}\n هي ${p.absPercentage.toFixed(1)}% \nلذا نأمل منكِ الانتباه والحرص على عدم الغياب`
+                : `عزيزي ${p.traineeName}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابك في مقرر \n${p.courseName}\n هي ${p.absPercentage.toFixed(1)}% \nلذا نأمل منك الانتباه والحرص على عدم الغياب`;
+                
             let waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(msg)}`;
             
             let statusBadge = '';
+            let deprivedText = isFemale ? 'محرومة (ح)' : 'محروم (ح)';
+            
             if (p.isDeprived) {
-                statusBadge = '<span class="badge badge-danger">محروم (ح)</span>';
+                statusBadge = `<span class="badge badge-danger">${deprivedText}</span>`;
             } else if (p.absPercentage >= 20) {
                 statusBadge = '<span class="badge badge-danger">تجاوز 20%</span>';
             } else if (p.absPercentage >= 15) {
