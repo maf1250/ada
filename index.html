@@ -180,7 +180,6 @@
 
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
 
-        // 1. استخراج ساعات المقررات من SS01
         courseHours = {};
         let crnDays = {}; 
         
@@ -210,7 +209,6 @@
             }
         });
 
-        // 2. بناء سجل تحضير المدربين
         crnHasData = {};
         rawData.so04.forEach(row => {
             let crn = row['الرقم المرجعي'];
@@ -222,7 +220,6 @@
             crnHasData[crn][weekNum] = true; 
         });
 
-        // 3. تجهيز بيانات المتدربين من SF01
         let traineesMap = {};
         rawData.sf01.forEach(row => {
             let id = row['رقم المتدرب'];
@@ -275,7 +272,6 @@
             }
         });
 
-        // 4. معالجة الغياب من SO04
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'];
             let crn = row['الرقم المرجعي'];
@@ -293,17 +289,15 @@
                 traineesMap[id].weeklyCrnAbsences[weekNum] = {};
             }
             if(!traineesMap[id].weeklyCrnAbsences[weekNum][crn]) {
-                traineesMap[id].weeklyCrnAbsences[weekNum][crn] = { absHours: 0, hasUnexcused: false };
+                traineesMap[id].weeklyCrnAbsences[weekNum][crn] = { unexcusedAbs: 0 };
             }
             
-            // نجمع الساعات (بعذر أو بدون) لمعرفة التغيب الكلي، لكن نصنف بدون عذر للاعتماد
-            traineesMap[id].weeklyCrnAbsences[weekNum][crn].absHours += absHours;
+            // تم حصر الغياب "بدون عذر" فقط للتأثير على حالة الأسبوع (الكامل/الجزئي)
             if(excuse.includes('بدون عذر')) {
-                traineesMap[id].weeklyCrnAbsences[weekNum][crn].hasUnexcused = true;
+                traineesMap[id].weeklyCrnAbsences[weekNum][crn].unexcusedAbs += absHours;
             }
         });
 
-        // 5. تصنيف المتدربين وحساب الحرمان
         processedData.active = [];
         processedData.excluded = [];
         processedData.percentages = [];
@@ -347,59 +341,52 @@
 
             t.totalUniqueCourses = t.courseCodes.size;
             t.totalDeprivedCourses = t.deprivedCourseCodes.size;
-
             t.weeksAbsentCount = 0;
             
-            // حساب حالة الأسابيع (المنطق الذكي والمحسن)
+            // المنطق النهائي والمحكم لتحديد الغياب الكامل أو الجزئي
             let activeCrns = Object.keys(t.crns);
             let totalCoursesCount = activeCrns.length; 
 
             for(let w=1; w<=totalWeeks; w++) {
                 let absentCrnsCount = 0;
-                let hasPresence = false;
+                let fullyAbsentUnexcusedCrnsCount = 0;
                 let anyTrainerTaught = false;
-                let weekHasUnexcused = false;
 
                 activeCrns.forEach(crn => {
-                    let trainerTaught = crnHasData[crn] && crnHasData[crn][w];
+                    if (crnHasData[crn] && crnHasData[crn][w]) {
+                        anyTrainerTaught = true;
+                    }
+
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
-                    
-                    let totalAbs = (wData && wData.absHours > 0) ? wData.absHours : 0;
+                    let unexcusedAbs = wData ? wData.unexcusedAbs : 0;
                     let crnHours = t.crns[crn].hours || 0;
                     
-                    if (totalAbs > 0) {
+                    if (unexcusedAbs > 0) {
                         absentCrnsCount++;
-                        if (wData.hasUnexcused) weekHasUnexcused = true;
                         
-                        // إذا كانت ساعات الغياب أقل من ساعات المقرر الأسبوعية الإجمالية
-                        // فهذا إثبات قاطع بأن المتدرب "حضر" بقية المحاضرات الخاصة بالمقرر في ذلك الأسبوع
-                        if (crnHours > 0 && totalAbs < crnHours) {
-                            hasPresence = true;
+                        // نعتبره غاب المقرر بالكامل إذا كانت ساعات غيابه مساوية أو تتجاوز ساعات المقرر الأسبوعية
+                        // أو إذا لم نتمكن من جلب ساعات المقرر من ملف الجدول (يفترض الأسوأ احتياطاً)
+                        if (crnHours === 0 || unexcusedAbs >= crnHours) {
+                            fullyAbsentUnexcusedCrnsCount++;
                         }
-                    } else if (trainerTaught) {
-                        // المدرب قام بالتحضير، ولم يسجل غياباً للمتدرب، إذن هو حاضر 100%
-                        hasPresence = true;
-                        anyTrainerTaught = true;
                     }
                 });
 
                 if (totalCoursesCount === 0) {
                     t.weekStatuses[w] = "-";
-                } else if (absentCrnsCount > 0 && weekHasUnexcused) {
-                    if (!hasPresence) {
-                        // لم يحضر ولا أي ساعة في جميع المقررات التي تم تحضيرها (انقطاع كامل)
+                } else if (absentCrnsCount > 0) {
+                    // لكي يعتبر غياب كامل يجب أن يغيب (بدون عذر) وبشكل (كامل لساعات المقرر) في **جميع** المقررات المسجلة له
+                    if (fullyAbsentUnexcusedCrnsCount === totalCoursesCount) {
                         t.weekStatuses[w] = "كامل";
                         t.weeksAbsentCount++;
                     } else {
-                        // غاب بعض المحاضرات وحضر البعض الآخر
+                        // إذا غاب في بعض مقرراته (مثل سعود في الأسبوع 14)، يعتبر غياب جزئي
                         t.weekStatuses[w] = "جزئي";
-                        t.weeksAbsentCount++; // يحسب ضمن أسابيع المخالفات/الغيابات
+                        t.weeksAbsentCount++;
                     }
                 } else if (anyTrainerTaught) {
-                    // لم يغب أي غياب بدون عذر وحضر على الأقل محاضرة واحدة
                     t.weekStatuses[w] = "-"; 
                 } else {
-                    // لم يغب ولم يتأكد النظام من إقامة أي من محاضراته هذا الأسبوع
                     t.weekStatuses[w] = "محتمل";
                 }
             }
@@ -408,7 +395,6 @@
         });
 
         processedData.percentages.sort((a, b) => b.absPercentage - a.absPercentage);
-
         renderTables(totalWeeks);
         alert("تمت معالجة البيانات بنجاح!");
     }
@@ -455,37 +441,31 @@
             return html;
         };
 
-        // 1. الرئيسي
         let htmlMain = `<table>${createThead()}<tbody>`;
         processedData.active.forEach(t => htmlMain += createRow(t));
         htmlMain += `</tbody></table>`;
         document.getElementById('table-main').innerHTML = htmlMain;
 
-        // 2. غياب أسبوع كامل فأكثر
         let htmlFull = `<table>${createThead()}<tbody>`;
         processedData.active.filter(t => Object.values(t.weekStatuses).includes('كامل')).forEach(t => htmlFull += createRow(t));
         htmlFull += `</tbody></table>`;
         document.getElementById('table-fullweek').innerHTML = htmlFull;
 
-        // 3. محروم بكل المقررات
         let htmlDepAll = `<table>${createThead()}<tbody>`;
         processedData.active.filter(t => t.totalUniqueCourses > 0 && t.totalDeprivedCourses === t.totalUniqueCourses).forEach(t => htmlDepAll += createRow(t));
         htmlDepAll += `</tbody></table>`;
         document.getElementById('table-deprived-all').innerHTML = htmlDepAll;
 
-        // 4. محروم ماعدا مقرر
         let htmlDepExc = `<table>${createThead()}<tbody>`;
         processedData.active.filter(t => t.totalUniqueCourses > 1 && t.totalDeprivedCourses === (t.totalUniqueCourses - 1)).forEach(t => htmlDepExc += createRow(t));
         htmlDepExc += `</tbody></table>`;
         document.getElementById('table-deprived-except').innerHTML = htmlDepExc;
 
-        // 5. المنسحبين والمطوي قيدهم
         let htmlExc = `<table>${createThead()}<tbody>`;
         processedData.excluded.forEach(t => htmlExc += createRow(t));
         htmlExc += `</tbody></table>`;
         document.getElementById('table-excluded').innerHTML = htmlExc;
 
-        // 6. صفحة نسبة الغياب والواتساب
         let htmlPerc = `<table><thead><tr>
             <th>رقم المتدرب</th>
             <th>اسم المتدرب</th>
