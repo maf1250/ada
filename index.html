@@ -190,15 +190,34 @@
 
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
 
-        // 1. استخراج ساعات المقررات من SS01
+        // 1. استخراج ساعات المقررات من SS01 بدقة
         courseHours = {};
+        let crnDays = {}; // لمنع تكرار الساعات لنفس اليوم
+        
         rawData.ss01.forEach(row => {
             let crn = row['الرقم المرجعي'] || row['CRN'];
+            let contactHoursCol = row['ساعات الاتصال'];
             let time = row['الوقت'] || row['فترة المحاضرة'];
-            if (crn && time) {
-                let hours = calculateContactHours(time);
-                if(hours > 0) {
-                    courseHours[crn] = (courseHours[crn] || 0) + hours;
+            let day = row['اليوم'] || '';
+            
+            if (crn) {
+                // إذا كان عمود ساعات الاتصال موجوداً، نأخذ القيمة الأكبر للشعبة (لتفادي جمع المكرر)
+                if (contactHoursCol !== undefined && contactHoursCol !== "") {
+                    let h = parseFloat(contactHoursCol);
+                    if (!courseHours[crn] || h > courseHours[crn]) {
+                        courseHours[crn] = h;
+                    }
+                } 
+                // إذا لم يوجد، نحسب من الوقت مع منع تكرار نفس اليوم
+                else if (time) {
+                    let uniqueKey = day + time;
+                    if (!crnDays[crn]) crnDays[crn] = new Set();
+                    
+                    if (!crnDays[crn].has(uniqueKey)) {
+                        crnDays[crn].add(uniqueKey);
+                        let h = calculateContactHours(time);
+                        courseHours[crn] = (courseHours[crn] || 0) + h;
+                    }
                 }
             }
         });
@@ -218,15 +237,19 @@
             let id = row['رقم المتدرب'];
             if(!id) return;
             
+            let regStatus = row['حالة تسجيل'] || '';
+            let traineeStatus = row['حالة المتدرب'] || '';
+            
             if(!traineesMap[id]) {
                 traineesMap[id] = {
                     id: id,
                     name: row['إسم المتدرب'] || row['اسم المتدرب'],
                     major: row['التخصص'],
                     phone: row['رقم الجوال'],
-                    status: row['حالة المتدرب'] || row['حالة تسجيل'] || '',
-                    crns: {}, // crn -> { code, name, hours, absHours }
-                    courseCodes: new Set(), // لحساب المقررات الفريدة (نظري+عملي = 1)
+                    regStatus: regStatus,
+                    traineeStatus: traineeStatus,
+                    crns: {}, 
+                    courseCodes: new Set(), 
                     totalWeeklyHours: 0,
                     absencesByWeek: {}
                 };
@@ -238,15 +261,25 @@
 
             if(crn && courseCode) {
                 traineesMap[id].courseCodes.add(courseCode);
-                let ch = courseHours[crn] || 0;
-                traineesMap[id].totalWeeklyHours += ch;
                 
-                traineesMap[id].crns[crn] = {
-                    code: courseCode,
-                    name: courseName,
-                    hours: ch,
-                    absHours: 0
-                };
+                // منع تكرار الشعبة لنفس المتدرب في حساب الساعات الأسبوعية
+                if (!traineesMap[id].crns[crn]) {
+                    let ch = courseHours[crn] || 0;
+                    traineesMap[id].totalWeeklyHours += ch;
+                    
+                    traineesMap[id].crns[crn] = {
+                        code: courseCode,
+                        name: courseName,
+                        hours: ch,
+                        absHours: 0,
+                        isOfficiallyDeprived: false
+                    };
+                }
+                
+                // التقاط الحرمان الرسمي من النظام
+                if (regStatus.includes('حرمان')) {
+                    traineesMap[id].crns[crn].isOfficiallyDeprived = true;
+                }
             }
         });
 
@@ -288,24 +321,25 @@
 
         Object.values(traineesMap).forEach(t => {
             
-            // فلترة المنسحبين والمطوي قيدهم
-            let isExcluded = t.status.includes('انسحاب') || t.status.includes('مطوي');
+            // فلترة المنسحبين والمطوي قيدهم بناءً على العمودين
+            let isExcluded = t.regStatus.includes('انسحاب') || t.regStatus.includes('مطوي') || 
+                             t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي');
 
-            t.deprivedCourseCodes = new Set(); // المقررات التي حُرم فيها (سواء نظري أو عملي)
+            t.deprivedCourseCodes = new Set(); 
 
             Object.keys(t.crns).forEach(crn => {
                 let crnData = t.crns[crn];
                 let totalCrnHours = crnData.hours * totalWeeks;
-                let limit = totalCrnHours * 0.20; // 20%
+                let limit = totalCrnHours * 0.20; 
                 
-                crnData.isDeprived = (limit > 0 && crnData.absHours >= limit);
+                // الحرمان إما رسمي من النظام أو رياضي
+                crnData.isDeprived = crnData.isOfficiallyDeprived || (limit > 0 && crnData.absHours >= limit);
                 crnData.absPercentage = totalCrnHours > 0 ? (crnData.absHours / totalCrnHours) * 100 : 0;
 
                 if (crnData.isDeprived) {
                     t.deprivedCourseCodes.add(crnData.code);
                 }
 
-                // إضافة لصفحة النسب (للمتدربين النشطين فقط، والذين لديهم غياب > 0)
                 if(!isExcluded && crnData.absPercentage > 0) {
                     processedData.percentages.push({
                         traineeName: t.name,
@@ -348,7 +382,6 @@
             }
         });
 
-        // ترتيب صفحة النسب تنازلياً حسب نسبة الغياب
         processedData.percentages.sort((a, b) => b.absPercentage - a.absPercentage);
 
         renderTables(totalWeeks);
@@ -441,7 +474,7 @@
         
         processedData.percentages.forEach(p => {
             let formattedPhone = formatPhone(p.phone);
-            let msg = `عزيزي ${p.traineeName}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابك في مقرر\n${p.courseName}\nهي ${p.absPercentage.toFixed(1)}%\nلذا نأمل منك الانتباه والحرص على عدم الغياب`;
+            let msg = `عزيزي ${p.traineeName}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابك في مقرر \n${p.courseName}\n هي ${p.absPercentage.toFixed(1)}% \nلذا نأمل منك الانتباه والحرص على عدم الغياب`;
             let waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(msg)}`;
             
             htmlPerc += `<tr>
