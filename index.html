@@ -120,7 +120,6 @@
     let rawData = { sf01: [], ss01: [], so04: [] };
     let processedData = { active: [], excluded: [], percentages: [] };
     let courseHours = {}; 
-    let crnHasData = {}; 
 
     function switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -180,6 +179,7 @@
 
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
 
+        // 1. حساب الساعات النظرية من SS01
         courseHours = {};
         let crnDays = {}; 
         
@@ -209,17 +209,41 @@
             }
         });
 
-        crnHasData = {};
+        // 2. الخوارزمية الجديدة: حساب الساعات الفعلية (TTH) لكل شعبة أسبوعياً بناءً على تقرير الغياب!
+        let crnWeekSessions = {}; 
         rawData.so04.forEach(row => {
             let crn = row['الرقم المرجعي'];
             let weekNum = parseInt(row['رقم الأسبوع']);
+            let date = row['تاريخ المحاضرة'] || '';
+            let time = row['فترة المحاضرة'] || '';
+            let absHours = parseFloat(row['ساعات الغياب']) || 0;
+            let excuse = row['نوع العذر'] || '';
             
-            if(!crn || isNaN(weekNum)) return;
+            if(!crn || isNaN(weekNum) || absHours <= 0) return;
+            if(excuse.includes('جلسة ملغاة')) return; // تجاهل الجلسات الملغاة تماماً
 
-            if(!crnHasData[crn]) crnHasData[crn] = {};
-            crnHasData[crn][weekNum] = true; 
+            if(!crnWeekSessions[weekNum]) crnWeekSessions[weekNum] = {};
+            if(!crnWeekSessions[weekNum][crn]) crnWeekSessions[weekNum][crn] = {};
+            
+            let sessionKey = date + '_' + time;
+            let currentMax = crnWeekSessions[weekNum][crn][sessionKey] || 0;
+            // نأخذ الحد الأقصى لساعات الغياب المسجلة لتلك الجلسة كإثبات لطولها الفعلي
+            crnWeekSessions[weekNum][crn][sessionKey] = Math.max(currentMax, absHours);
         });
 
+        let TTH = {}; // Total Taught Hours (الساعات التي أقيمت فعلياً)
+        for(let w in crnWeekSessions) {
+            TTH[w] = {};
+            for(let c in crnWeekSessions[w]) {
+                let sum = 0;
+                for(let key in crnWeekSessions[w][c]) {
+                    sum += crnWeekSessions[w][c][key];
+                }
+                TTH[w][c] = sum;
+            }
+        }
+
+        // 3. تجهيز بيانات المتدربين من SF01
         let traineesMap = {};
         rawData.sf01.forEach(row => {
             let id = row['رقم المتدرب'];
@@ -263,7 +287,7 @@
                         code: courseCode,
                         name: courseName,
                         hours: ch,
-                        absHours: 0,
+                        absHours: 0, // للنسبة المئوية (بدون عذر)
                         isOfficiallyDeprived: isDeprived
                     };
                 } else if (isDeprived) {
@@ -272,6 +296,7 @@
             }
         });
 
+        // 4. معالجة الغياب
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'];
             let crn = row['الرقم المرجعي'];
@@ -279,7 +304,9 @@
             let absHours = parseFloat(row['ساعات الغياب']) || 0;
             let excuse = row['نوع العذر'] || '';
             
-            if(!traineesMap[id] || !traineesMap[id].crns[crn] || absHours === 0 || isNaN(weekNum)) return;
+            if(!traineesMap[id] || !traineesMap[id].crns[crn] || isNaN(weekNum) || absHours === 0) return;
+            
+            if(excuse.includes('جلسة ملغاة')) return; // لا نحتسب الجلسة الملغاة على المتدرب
 
             if(excuse.includes('بدون عذر')) {
                 traineesMap[id].crns[crn].absHours += absHours;
@@ -292,18 +319,17 @@
                 traineesMap[id].weeklyCrnAbsences[weekNum][crn] = { unexcusedAbs: 0 };
             }
             
-            // تم حصر الغياب "بدون عذر" فقط للتأثير على حالة الأسبوع (الكامل/الجزئي)
             if(excuse.includes('بدون عذر')) {
                 traineesMap[id].weeklyCrnAbsences[weekNum][crn].unexcusedAbs += absHours;
             }
         });
 
+        // 5. التصنيف وحساب الحرمان والأسابيع
         processedData.active = [];
         processedData.excluded = [];
         processedData.percentages = [];
 
         Object.values(traineesMap).forEach(t => {
-            
             let isFullyExcluded = t.regStatus.includes('انسحاب') || t.regStatus.includes('مطوي') || 
                                   t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي');
 
@@ -314,7 +340,6 @@
             }
 
             t.deprivedCourseCodes = new Set(); 
-
             Object.keys(t.crns).forEach(crn => {
                 let crnData = t.crns[crn];
                 let totalCrnHours = crnData.hours * totalWeeks;
@@ -343,44 +368,50 @@
             t.totalDeprivedCourses = t.deprivedCourseCodes.size;
             t.weeksAbsentCount = 0;
             
-            // المنطق النهائي والمحكم لتحديد الغياب الكامل أو الجزئي
             let activeCrns = Object.keys(t.crns);
-            let totalCoursesCount = activeCrns.length; 
 
             for(let w=1; w<=totalWeeks; w++) {
                 let absentCrnsCount = 0;
-                let fullyAbsentUnexcusedCrnsCount = 0;
+                let fullyAbsentCrnsCount = 0;
+                let expectedCrnsCount = 0; 
                 let anyTrainerTaught = false;
 
                 activeCrns.forEach(crn => {
-                    if (crnHasData[crn] && crnHasData[crn][w]) {
+                    let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0;
+                    let scheduleHours = t.crns[crn].hours || 0;
+                    
+                    // نعتبر المقرر متوقعاً إذا تم التحضير فيه (taughtHours) أو مسجّل له ساعات بالجدول
+                    if (taughtHours > 0 || scheduleHours > 0) {
+                        expectedCrnsCount++;
+                    }
+                    if (taughtHours > 0) {
                         anyTrainerTaught = true;
                     }
 
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
                     let unexcusedAbs = wData ? wData.unexcusedAbs : 0;
-                    let crnHours = t.crns[crn].hours || 0;
                     
                     if (unexcusedAbs > 0) {
                         absentCrnsCount++;
                         
-                        // نعتبره غاب المقرر بالكامل إذا كانت ساعات غيابه مساوية أو تتجاوز ساعات المقرر الأسبوعية
-                        // أو إذا لم نتمكن من جلب ساعات المقرر من ملف الجدول (يفترض الأسوأ احتياطاً)
-                        if (crnHours === 0 || unexcusedAbs >= crnHours) {
-                            fullyAbsentUnexcusedCrnsCount++;
+                        // نعتمد على الساعات التي "أقيمت فعلياً" كمرجع أول، وإلا نعود للجدول
+                        let maxExpectedHours = taughtHours > 0 ? taughtHours : scheduleHours;
+                        
+                        // إذا كان الغياب يغطي 100% من الساعات الفعلية، فهو غياب كامل عن هذا المقرر
+                        if (maxExpectedHours === 0 || unexcusedAbs >= maxExpectedHours) {
+                            fullyAbsentCrnsCount++;
                         }
                     }
                 });
 
-                if (totalCoursesCount === 0) {
+                if (expectedCrnsCount === 0) {
                     t.weekStatuses[w] = "-";
                 } else if (absentCrnsCount > 0) {
-                    // لكي يعتبر غياب كامل يجب أن يغيب (بدون عذر) وبشكل (كامل لساعات المقرر) في **جميع** المقررات المسجلة له
-                    if (fullyAbsentUnexcusedCrnsCount === totalCoursesCount) {
+                    // يحصل على "كامل" فقط إذا غاب غياباً تاماً عن جميع المقررات المتوقعة
+                    if (fullyAbsentCrnsCount === expectedCrnsCount) {
                         t.weekStatuses[w] = "كامل";
                         t.weeksAbsentCount++;
                     } else {
-                        // إذا غاب في بعض مقرراته (مثل سعود في الأسبوع 14)، يعتبر غياب جزئي
                         t.weekStatuses[w] = "جزئي";
                         t.weeksAbsentCount++;
                     }
@@ -512,7 +543,6 @@
         htmlPerc += `</tbody></table>`;
         document.getElementById('table-percentages').innerHTML = htmlPerc;
     }
-
 </script>
 </body>
 </html>
