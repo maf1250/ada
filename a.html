@@ -8,7 +8,10 @@
     
     <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334c2b4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E" type="image/svg+xml">
     
+    <!-- مكتبات معالجة الإكسل والملفات -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
@@ -76,7 +79,7 @@
         * { box-sizing: border-box; }
         
         ._shell { display: flex; height: 100%; width: 100%; }
-        ._sidebar { width: 240px; background: var(--bg-elevated); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: var(--sp-3) 0; flex-shrink: 0; overflow-y: auto; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);}
+        ._sidebar { width: 250px; background: var(--bg-elevated); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: var(--sp-3) 0; flex-shrink: 0; overflow-y: auto; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);}
         ._main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-base); }
         ._header { height: var(--header-h); background: var(--bg-surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 var(--sp-4); justify-content: space-between; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);}
         
@@ -91,6 +94,9 @@
         ._navItem:hover { background: var(--bg-hover); color: var(--text-primary); }
         ._navItem.active { background: var(--primary-subtle); color: var(--primary); border-right-color: var(--primary); }
         
+        .tab-badge { margin-right: auto; background: var(--primary-subtle); color: var(--primary); font-size: 10.5px; padding: 2px 8px; border-radius: var(--radius-full); font-weight: 800; font-family: Tahoma, monospace; border: 1px solid var(--primary-border); }
+        [data-theme="dark"] .tab-badge { background: #1a3c39; border-color: var(--primary-border); }
+
         ._uploadGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
         ._dropZone { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--bg-surface); padding: var(--sp-6) var(--sp-4); text-align: center; cursor: pointer; transition: all var(--dur) var(--ease); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; position: relative;}
         ._dropZone:hover { border-color: var(--primary); background: var(--primary-subtle); }
@@ -113,9 +119,9 @@
         .btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
 
         /* الأزرار العلوية */
-        .btn-upload { background: var(--primary); color: var(--on-primary); border: none; padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all var(--dur) var(--ease); }
-        .btn-upload:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px var(--primary-subtle); }
-        
+        .btn-action { background: var(--bg-inset); color: var(--text-primary); border: 1px solid var(--border); padding: 7px 14px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all var(--dur) var(--ease); }
+        .btn-action:hover { background: var(--bg-hover); border-color: var(--primary); color: var(--primary); }
+
         /* زر الوضع الليلي/النهاري */
         .btn-theme { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--dur) var(--ease); margin-right: 15px; }
         .btn-theme:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-secondary); }
@@ -185,6 +191,22 @@
 
         /* عداد الزوار */
         .visitor-counter { margin-top: auto; display: flex; justify-content: center; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
+
+        /* تنسيقات الطباعة (PDF) */
+        @media print {
+            ._sidebar, ._header, ._filtersBar, ._uploadGrid, .info-card, .btn-action, .visitor-counter, .filter-row { display: none !important; }
+            ._shell { display: block; height: auto; }
+            ._main { display: block; height: auto; overflow: visible; background: #fff; }
+            ._content { padding: 0; overflow: visible; }
+            ._tableWrapper { max-height: none !important; border: none !important; overflow: visible !important; background: transparent; }
+            body { background: #fff; color: #000; font-size: 12px; }
+            table { border: 1px solid #ccc; }
+            th, td { border: 1px solid #ccc !important; padding: 6px !important; color: #000; }
+            th { background: #f5f5f5 !important; color: #000 !important; }
+            .badge { border: 1px solid #000 !important; color: #000 !important; background: transparent !important; }
+            .course-card { background: #fff !important; border: 1px solid #999 !important; color: #000 !important; page-break-inside: avoid; }
+            .btn-whatsapp { display: none !important; }
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -199,14 +221,34 @@
                 م. محمد يوسف الشبيلي
             </div>
         </div>
-        <div class="_navItem" id="nav-dashboard" onclick="switchTab('report-dashboard', this)">لوحة الإحصائيات</div>
-        <div class="_navItem" id="nav-main" onclick="switchTab('report-main', this)">المتدربون</div>
-        <div class="_navItem" onclick="switchTab('report-matrix', this)">مصفوفة الغياب</div>
-        <div class="_navItem" onclick="switchTab('report-percentages', this)">نسبة الغياب والإنذارات</div>
-        <div class="_navItem" onclick="switchTab('report-fullweek', this)">غياب أسبوع كامل فأكثر</div>
-        <div class="_navItem" onclick="switchTab('report-deprived-all', this)">الحرمان بكل المقررات</div>
-        <div class="_navItem" onclick="switchTab('report-deprived-except', this)">الحرمان ماعدا مقرر</div>
-        <div class="_navItem" id="nav-excluded" onclick="switchTab('report-excluded', this)">المنسحبين والمطوي قيدهم</div>
+        
+        <div class="_navItem active" id="nav-upload" onclick="switchTab('upload', this)">
+            <span>رفع البيانات</span>
+        </div>
+        <div class="_navItem" id="nav-dashboard" onclick="switchTab('report-dashboard', this)">
+            <span>لوحة الإحصائيات</span>
+        </div>
+        <div class="_navItem" id="nav-main" onclick="switchTab('report-main', this)">
+            <span id="label-main">المتدربون</span><span class="tab-badge" id="badge-main">0</span>
+        </div>
+        <div class="_navItem" onclick="switchTab('report-matrix', this)">
+            <span>مصفوفة الغياب</span><span class="tab-badge" id="badge-matrix">0</span>
+        </div>
+        <div class="_navItem" onclick="switchTab('report-percentages', this)">
+            <span>نسبة الغياب والإنذارات</span><span class="tab-badge" id="badge-percentages">0</span>
+        </div>
+        <div class="_navItem" onclick="switchTab('report-fullweek', this)">
+            <span>غياب أسبوع كامل فأكثر</span><span class="tab-badge" id="badge-fullweek">0</span>
+        </div>
+        <div class="_navItem" onclick="switchTab('report-deprived-all', this)">
+            <span>الحرمان بكل المقررات</span><span class="tab-badge" id="badge-deprived-all">0</span>
+        </div>
+        <div class="_navItem" onclick="switchTab('report-deprived-except', this)">
+            <span>الحرمان ماعدا مقرر</span><span class="tab-badge" id="badge-deprived-except">0</span>
+        </div>
+        <div class="_navItem" id="nav-excluded" onclick="switchTab('report-excluded', this)">
+            <span id="label-excluded">المنسحبين والمطوي قيدهم</span><span class="tab-badge" id="badge-excluded">0</span>
+        </div>
         
         <div class="visitor-counter">
             <img src="https://visitor-badge.laobi.icu/badge?page_id=https%3A%2F%2Fmaf1250.github.io%2Faudit&radius=8" alt="visitor badge"/>
@@ -225,9 +267,14 @@
                 <label>عدد أسابيع الفصل:</label>
                 <input type="number" id="totalWeeks" class="input-number" value="18" onchange="processData()">
                 
-                <button class="btn-upload" onclick="switchTab('upload', null, 'رفع البيانات')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><path d="M12 10v6"/><path d="m9 13 3-3 3 3"/></svg>
-                    رفع البيانات
+                <!-- أزرار الطباعة والتصدير -->
+                <button class="btn-action" onclick="exportExcel()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    تصدير إكسل
+                </button>
+                <button class="btn-action" onclick="window.print()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    طباعة PDF
                 </button>
 
                 <button class="btn-theme" id="themeToggle" title="تبديل المظهر">
@@ -359,7 +406,8 @@
         
         if (el) {
             el.classList.add('active');
-            document.getElementById('pageTitle').innerText = el.innerText;
+            let spanTitle = el.querySelector('span:first-child');
+            document.getElementById('pageTitle').innerText = spanTitle ? spanTitle.innerText : el.innerText;
         } else if (titleOverride) {
             document.getElementById('pageTitle').innerText = titleOverride;
         }
@@ -374,12 +422,28 @@
         let pEl = dropZone.querySelector('p');
         pEl.innerText = file.name;
 
-        // قراءة تاريخ آخر تعديل للملف (Metadata) وعرضه
+        // قراءة تاريخ آخر تعديل للملف (Metadata) وعرضه بالأيام والساعات
         let fDate = new Date(file.lastModified);
+        let now = new Date();
+        let diffMs = Math.abs(now - fDate);
+        let diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+        let days = Math.floor(diffHrs / 24);
+        let hours = diffHrs % 24;
+        
+        let ageText = '';
+        if (days > 0) ageText += days + ' يوم ';
+        if (days > 0 && hours > 0) ageText += 'و ';
+        if (hours > 0) ageText += hours + ' ساعة';
+        if (days === 0 && hours === 0) ageText = 'أقل من ساعة';
+
         let dateStr = fDate.toLocaleDateString('en-GB') + ' ' + fDate.toLocaleTimeString('en-US');
         let dateEl = document.getElementById(`date-${type}`);
         if(dateEl) {
-            dateEl.innerHTML = `<span style="background:var(--bg-elevated); padding:3px 10px; border-radius:4px; border:1px solid var(--border); display:inline-block;">تاريخ الملف: <span dir="ltr" style="display:inline-block;">${dateStr}</span></span>`;
+            let color = days >= 3 ? 'var(--danger)' : (days >= 1 ? 'var(--warning)' : 'var(--success)');
+            dateEl.innerHTML = `<div style="background:var(--bg-elevated); padding:4px 10px; border-radius:4px; border:1px solid var(--border); display:inline-block; font-weight:normal;">
+                تاريخ الملف: <span dir="ltr" style="display:inline-block; font-weight:bold;">${dateStr}</span> 
+                <span style="color:${color}; margin-right:8px; font-weight:bold;">(العمر: ${ageText})</span>
+            </div>`;
         }
 
         const reader = new FileReader();
@@ -392,6 +456,62 @@
             window.processData();
         };
         reader.readAsArrayBuffer(file);
+    };
+
+    window.exportExcel = async function() {
+        let activeTab = document.querySelector('.tab-content:not(.hidden)');
+        if (!activeTab || activeTab.id === 'upload' || activeTab.id === 'report-dashboard') {
+            alert('يرجى اختيار أحد جداول التقارير أولاً لتصديره');
+            return;
+        }
+
+        let table = activeTab.querySelector('table');
+        if (!table) {
+            alert('لا يوجد جدول لتصديره');
+            return;
+        }
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('التقرير', { views: [{ rightToLeft: true }] });
+
+        // استخراج العناوين
+        let theadRows = table.querySelectorAll('thead tr');
+        let headerRow = [];
+        let headerTr = theadRows[0]; 
+        let ths = headerTr.querySelectorAll('th');
+        ths.forEach(th => {
+            headerRow.push(th.innerText.replace(/▲|▼/g, '').trim());
+        });
+        worksheet.addRow(headerRow);
+        
+        // استخراج البيانات المرئية فقط
+        let tbody = table.querySelector('tbody');
+        if (tbody) {
+            let trs = tbody.querySelectorAll('tr');
+            trs.forEach(tr => {
+                if (tr.style.display !== 'none') {
+                    let rowData = [];
+                    let tds = tr.querySelectorAll('td');
+                    tds.forEach(td => {
+                        // تنظيف النص للعرض داخل الإكسل
+                        let text = td.innerText.trim().replace(/\n+/g, ' | ');
+                        rowData.push(text);
+                    });
+                    worksheet.addRow(rowData);
+                }
+            });
+        }
+
+        // تنسيق رؤوس الأعمدة
+        worksheet.getRow(1).font = { bold: true, size: 12 };
+        worksheet.getRow(1).alignment = { horizontal: 'center' };
+        worksheet.columns.forEach(column => {
+            column.width = 22; 
+            column.alignment = { wrapText: true, vertical: 'middle' };
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), 'report.xlsx');
     };
 
     window.calculateContactHours = function(timeStr) {
@@ -427,7 +547,6 @@
         const rows = Array.from(tbody.querySelectorAll('tr'));
         const isAscending = th.classList.contains('asc');
 
-        // إزالة حالة الفرز من جميع الرؤوس الأخرى
         table.querySelectorAll('th').forEach(h => {
             h.classList.remove('asc', 'desc');
             h.innerHTML = h.innerHTML.replace(/ <span class="sort-icon">.*?<\/span>/g, '');
@@ -478,7 +597,6 @@
                 let colFilters = table.querySelectorAll('.col-filter');
                 
                 trs.forEach(tr => {
-                    // التصفية الشاملة للبحث النصي
                     let idTd = tr.getElementsByTagName("td")[0];
                     let nameTd = tr.getElementsByTagName("td")[1];
                     let idVal = idTd ? (idTd.textContent || idTd.innerText) : "";
@@ -491,7 +609,6 @@
                         matchGlobalText = (tr.textContent || tr.innerText).toLowerCase().indexOf(globalTextFilter) > -1;
                     }
                     
-                    // التصفية عبر القوائم العلوية
                     let rowMajor = tr.getAttribute('data-major') || "";
                     let rowStatus = tr.getAttribute('data-status') || "";
                     let rowAbsent = tr.getAttribute('data-absent') === 'true';
@@ -502,7 +619,6 @@
                     
                     let show = matchGlobalText && matchMajor && matchStatus && matchAbsence;
 
-                    // التصفية المخصصة لكل عمود (السطر الثاني من الترويسة)
                     if (show && colFilters.length > 0) {
                         for (let i = 0; i < colFilters.length; i++) {
                             let filterVal = colFilters[i].value.trim().toLowerCase();
@@ -528,8 +644,8 @@
     };
 
     window.updateUIText = function() {
-        document.getElementById('nav-main').innerText = isFemale ? 'المتدربات' : 'المتدربون';
-        document.getElementById('nav-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبين والمطوي قيدهم';
+        document.getElementById('label-main').innerText = isFemale ? 'المتدربات' : 'المتدربون';
+        document.getElementById('label-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبين والمطوي قيدهم';
         
         document.getElementById('legend-full').innerHTML = isFemale 
             ? 'تعني أن المتدربة انقطعت وغابت غياباً تاماً وبنسبة 100% عن جميع مقرراتها المسجلة في ذلك الأسبوع.'
@@ -556,10 +672,11 @@
             : 'تعني أن نسبة غياب المتدرب في المقرر بلغت 20% فأكثر (مؤهل للحرمان إذا لم يُقبل عذره).';
 
         let activeTab = document.querySelector('._navItem.active');
-        if (activeTab && activeTab.id !== 'nav-main' && activeTab.id !== 'nav-excluded' && activeTab.id !== 'nav-dashboard') {
+        if (activeTab && activeTab.id !== 'nav-main' && activeTab.id !== 'nav-excluded' && activeTab.id !== 'nav-dashboard' && activeTab.id !== 'nav-upload') {
             
         } else if (activeTab) {
-            document.getElementById('pageTitle').innerText = activeTab.innerText;
+            let spanTitle = activeTab.querySelector('span:first-child');
+            document.getElementById('pageTitle').innerText = spanTitle ? spanTitle.innerText : activeTab.innerText;
         }
     };
 
@@ -845,6 +962,16 @@
         });
 
         processedData.percentages.sort((a, b) => b.absPercentage - a.absPercentage);
+        
+        // تحديث العدادات (Badges) في القائمة الجانبية
+        document.getElementById('badge-main').innerText = processedData.active.length;
+        document.getElementById('badge-matrix').innerText = processedData.active.length;
+        document.getElementById('badge-percentages').innerText = processedData.percentages.length;
+        document.getElementById('badge-fullweek').innerText = processedData.active.filter(t => Object.values(t.weekStatuses).includes('كامل')).length;
+        document.getElementById('badge-deprived-all').innerText = processedData.active.filter(t => t.totalUniqueCourses > 0 && t.totalDeprivedCourses === t.totalUniqueCourses).length;
+        document.getElementById('badge-deprived-except').innerText = processedData.active.filter(t => t.totalUniqueCourses > 1 && t.totalDeprivedCourses === (t.totalUniqueCourses - 1)).length;
+        document.getElementById('badge-excluded').innerText = processedData.excluded.length;
+
         window.renderTables(totalWeeks);
         window.renderDashboard(); 
     };
@@ -996,7 +1123,6 @@
                     html += `<td class="text-center">${badge}</td>`;
                 }
             } else {
-                // إضافة أعمدة الحالة للتبويب الخاص بالمنسحبين
                 html += `
                 <td>${t.regStatus || '-'}</td>
                 <td>${t.traineeStatus || '-'}</td>`;
@@ -1134,7 +1260,7 @@
         window.filterTables();
     };
 
-    window.switchTab('upload', null, 'رفع البيانات');
+    window.switchTab('upload', document.getElementById('nav-upload'));
 </script>
 </body>
 </html>
