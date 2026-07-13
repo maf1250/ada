@@ -591,7 +591,7 @@ themeBtn.addEventListener('click', () => {
     window.exportExcel = async function() {
         let activeTab = document.querySelector('.tab-content:not(.hidden)');
         if (!activeTab || activeTab.id === 'upload' || activeTab.id === 'report-dashboard') {
-            alert('للتصدير، لابد من اختيار التبويبة المرغوبة من القائمةل');
+            alert('للتصدير، لابد من اختيار التبويبة المرغوبة من القائمة');
             return;
         }
 
@@ -1260,7 +1260,7 @@ themeBtn.addEventListener('click', () => {
             let html = `<thead><tr>
                 <th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th>
                 <th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th>
-                <th class="nowrap sortable" style="min-width: 150px;" onclick="sortTable(this, 2, false)">التخصص</th>`;              
+                <th class="nowrap sortable" style="min-width: 180px;" onclick="sortTable(this, 2, false)">التخصص</th>`;              
             
             let numCols = 3;
             if(!isExcluded) {
@@ -1331,7 +1331,7 @@ themeBtn.addEventListener('click', () => {
         let htmlMatrix = `<table><thead><tr>
             <th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th>
             <th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th>
-            <th class="nowrap sortable" style="min-width: 150px;" onclick="sortTable(this, 2, false)">التخصص</th>
+            <th class="nowrap sortable" style="min-width: 180px;" onclick="sortTable(this, 2, false)">التخصص</th>
             <th>المقررات المسجلة ونسبة غياب كل مقرر</th>
         </tr>
         ${createFilterRow(4)}
