@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#14191c" />
+    <meta id="theme-meta" name="theme-color" content="#14191c" />
     <title>نظام متابعة غياب المتدربين</title>
     
     <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334c2b4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E" type="image/svg+xml">
@@ -16,11 +16,11 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
         
-        /* الوضع النهاري (ألوان هادئة مستوحاة من هوية المؤسسة) */
+        /* الوضع النهاري */
         :root {
-            --bg-base: #e3ecee;      /* خلفية الصفحة */
-            --bg-surface: #edf3f5;   /* خلفية الجداول والصناديق */
-            --bg-elevated: #edf3f5;  /* خلفية القائمة الجانبية */
+            --bg-base: #e3ecee;
+            --bg-surface: #edf3f5;
+            --bg-elevated: #edf3f5;
             --bg-hover: #e2ebed;
             --bg-inset: #e2ebed;
             --border: #cddbe0;
@@ -48,7 +48,7 @@
             --ease: cubic-bezier(.4, 0, .2, 1); --dur: .2s; --header-h: 65px;
         }
 
-        /* الوضع الليلي */
+        /* الوضع الليلي - يتم تفعيله عند وجود data-theme="dark" في الـ html */
         [data-theme="dark"] {
             --bg-base: #14191c;
             --bg-surface: #1a2226;
@@ -83,7 +83,6 @@
         ._main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-base); }
         ._header { height: var(--header-h); background: var(--bg-surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 var(--sp-4); justify-content: space-between; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease);}
         
-        /* شريط التصفية العلوية */
         ._filtersBar { background: var(--bg-surface); border-bottom: 1px solid var(--border); padding: 8px var(--sp-4); display: flex; align-items: center; gap: 15px; flex-wrap: wrap; transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease); }
         .input-select { background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-primary); padding: 6px 10px; border-radius: var(--radius-sm); font-family: inherit; font-size: 13px; cursor: pointer; outline: none; transition: all var(--dur) var(--ease); }
         .input-select:focus { border-color: var(--primary); background: var(--bg-elevated); }
@@ -94,11 +93,9 @@
         ._navItem:hover { background: var(--bg-hover); color: var(--text-primary); }
         ._navItem.active { background: var(--primary-subtle); color: var(--primary); border-right-color: var(--primary); }
         
-        /* التنسيق الافتراضي لعدادات التبويبات */
         .tab-badge { margin-right: auto; background: var(--primary-subtle); color: var(--primary); font-size: 10.5px; padding: 2px 8px; border-radius: var(--radius-full); font-weight: 800; font-family: Tahoma, monospace; border: 1px solid var(--primary-border); transition: all var(--dur) var(--ease); }
         [data-theme="dark"] .tab-badge { background: #1a3c39; border-color: var(--primary-border); }
 
-        /* تخصيص ألوان عدادات تبويبات الحرمان والمنسحبين */
         #badge-fullweek, #badge-deprived-all, #badge-deprived-except { background: var(--danger-subtle); color: var(--danger); border-color: #ef444440; }
         [data-theme="dark"] #badge-fullweek, [data-theme="dark"] #badge-deprived-all, [data-theme="dark"] #badge-deprived-except { background: rgba(217, 104, 104, 0.15); border-color: #d9686840; }
         #badge-excluded { background: var(--bg-hover); color: var(--text-muted); border-color: var(--border-strong); }
@@ -117,7 +114,6 @@
         .file-metadata { margin-top: 10px; font-size: 11.5px; font-weight: bold; color: var(--text-primary); display: none; width: 100%; }
         ._dropZone.has-file .file-metadata { display: block; }
 
-        /* الصندوق التوضيحي */
         .info-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--sp-4); margin-top: var(--sp-4); }
         .info-card h4 { margin: 0 0 var(--sp-3) 0; color: var(--info); font-size: var(--fs-md); }
         .info-card ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-3); color: var(--text-secondary); }
@@ -127,21 +123,20 @@
         .btn-whatsapp { background: #25D366; color: #fff; border: none; padding: 6px 16px; border-radius: var(--radius-full); font-family: inherit; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all var(--dur) var(--ease); white-space: nowrap; }
         .btn-whatsapp:hover { background: #1ebe57; transform: scale(1.05); }
 
-        /* الأزرار العلوية */
         .btn-action { background: var(--bg-inset); color: var(--text-primary); border: 1px solid var(--border); padding: 7px 14px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 700; font-size: 12.5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all var(--dur) var(--ease); }
         .btn-action:hover { background: var(--bg-hover); border-color: var(--primary); color: var(--primary); }
 
-        /* زر الوضع الليلي/النهاري */
         .btn-theme { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--dur) var(--ease); margin-right: 15px; }
         .btn-theme:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--text-secondary); }
+        
+        /* التحكم بالأيقونات بناءً على الثيم النشط في جذر الصفحة */
         [data-theme="dark"] .icon-sun { display: block; }
         [data-theme="dark"] .icon-moon { display: none; }
-        :root:not([data-theme="dark"]) .icon-sun { display: none; }
-        :root:not([data-theme="dark"]) .icon-moon { display: block; }
+        [data-theme="light"] .icon-sun { display: none; }
+        [data-theme="light"] .icon-moon { display: block; }
 
         .input-number { background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-primary); padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-sm); width: 60px; text-align: center; font-family: inherit; margin-left: 15px;}
         
-        /* حقل البحث */
         .search-box { position: relative; display: flex; align-items: center; margin-left: 15px;}
         .input-text { background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 12px 8px 32px; border-radius: var(--radius-sm); width: 250px; font-family: inherit; font-size: 13px; transition: all var(--dur) var(--ease); }
         .input-text:focus { outline: none; border-color: var(--primary); background: var(--bg-elevated); box-shadow: 0 0 0 2px var(--primary-subtle); }
@@ -149,13 +144,11 @@
 
         ._tableWrapper { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: auto; background: var(--bg-surface); max-height: calc(100vh - 200px); }
         
-        /* الجداول والفرز */
         table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); text-align: right; }
         th, td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); vertical-align: middle; }
         th { background: var(--bg-elevated); color: var(--text-secondary); font-weight: 700; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
         tbody tr:hover { background: var(--bg-hover); }
         
-        /* تثبيت الصف الثاني (صف التصفية) في الأعلى */
         thead tr:nth-child(2) th { top: 43px; background: var(--bg-surface); z-index: 11; border-top: 1px solid var(--border); }
         
         .sortable { cursor: pointer; user-select: none; transition: background-color var(--dur) var(--ease); }
@@ -177,7 +170,6 @@
         .nowrap { white-space: nowrap; }
         .name-cell { min-width: 250px !important; white-space: nowrap; }
         
-        /* تنسيقات مصفوفة المقررات */
         .course-card-wrapper { display: flex; flex-wrap: wrap; gap: 8px; min-width: 400px; }
         .course-card { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-inset); border: 1px solid var(--border); padding: 4px 10px; border-radius: var(--radius-md); font-size: 11.5px; transition: all var(--dur) var(--ease); }
         .course-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
@@ -188,19 +180,14 @@
         .course-card.c-success { border-color: var(--success); background: var(--success-subtle); color: var(--success); }
         [data-theme="dark"] .course-card.c-danger, [data-theme="dark"] .course-card.c-warning, [data-theme="dark"] .course-card.c-success { color: #fff; }
 
-        /* الداشبورد (الإحصائيات) */
         .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
         .dash-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--sp-4); text-align: center; }
         .dash-card h4 { margin: 0 0 var(--sp-2) 0; color: var(--text-secondary); font-size: var(--fs-md); }
         .dash-card .val { font-size: var(--fs-2xl); font-weight: 800; }
 
-        /* حقوق الإعداد */
         .credits { font-size: 12px; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-strong); line-height: 1.6; }
-
-        /* عداد الزوار */
         .visitor-counter { margin-top: auto; display: flex; justify-content: center; padding-top: var(--sp-4); padding-bottom: var(--sp-4); }
 
-        /* Modal النافذة المنبثقة للواتساب */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
         .modal-content { background: var(--bg-surface); padding: var(--sp-6); border-radius: var(--radius-lg); width: 90%; max-width: 500px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid var(--border); transform: translateY(-20px); transition: all 0.3s; }
@@ -218,7 +205,6 @@
         .wa-vars span { display: inline-block; background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-strong); cursor: pointer; color: var(--primary); font-weight: bold; margin-left: 5px; transition: all 0.2s; direction: ltr; }
         .wa-vars span:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
-        /* تنسيقات الطباعة (PDF) */
         @media print {
             ._sidebar, ._header, ._filtersBar, ._uploadGrid, .info-card, .btn-action, .visitor-counter, .filter-row { display: none !important; }
             ._shell { display: block; height: auto; }
@@ -235,7 +221,7 @@
         }
     </style>
 </head>
-<body data-theme="dark">
+<body> 
 
 <div class="_shell">
     <div class="_sidebar">
