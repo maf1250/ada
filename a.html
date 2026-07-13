@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#14191c" />
+    <title>نظام متابعة غياب المتدربين</title>
+    
+    <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334c2b4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2'/%3E%3Crect x='8' y='2' width='8' height='4' rx='1' ry='1'/%3E%3Cpath d='M9 14l2 2 4-4'/%3E%3C/svg%3E" type="image/svg+xml">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+        
+        :root {
+            --bg-base: #e3ecee;
+            --bg-surface: #edf3f5;
+            --bg-elevated: #edf3f5;
+            --bg-hover: #e2ebed;
+            --bg-inset: #e2ebed;
+            --border: #cddbe0;
+            --border-strong: #a9bec6;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --primary: #34c2b4;
+            --primary-hover: #2ba599;
+            --primary-subtle: #34c2b426;
+            --on-primary: #ffffff;
+            --success: #10b981;
+            --success-subtle: #10b98126;
+            --warning: #f59e0b;
+            --warning-subtle: #f59e0b26;
+            --danger: #ef4444;
+            --danger-subtle: #ef444426;
+            --info: #3b82f6;
+            --info-subtle: #3b82f626;
+            --font-family: "Cairo", sans-serif;
+            --fs-sm: .75rem; --fs-base: .8125rem; --fs-md: .875rem; --fs-lg: 1rem;
+            --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
+            --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px; --radius-full: 999px;
+            --ease: cubic-bezier(.4, 0, .2, 1); --dur: .2s; --header-h: 70px;
+        }
+
+        [data-theme="dark"] {
+            --bg-base: #14191c;
+            --bg-surface: #1a2226;
+            --bg-elevated: #222c31;
+            --bg-hover: #2a363c;
+            --bg-inset: #0e1416;
+            --border: #2c383e;
+            --border-strong: #3a474e;
+            --text-primary: #e8eeef;
+            --text-secondary: #9fb0b5;
+            --text-muted: #6d7e84;
+            --primary: #34c2b4;
+            --primary-hover: #4ed2c5;
+            --primary-subtle: #2bb5a824;
+            --on-primary: #07211e;
+        }
+        
+        body { font-family: var(--font-family); font-size: var(--fs-base); color: var(--text-primary); background: var(--bg-base); margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+        * { box-sizing: border-box; }
+        
+        ._shell { display: flex; height: 100%; width: 100%; }
+        ._sidebar { width: 250px; background: var(--bg-elevated); border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: var(--sp-3) 0; flex-shrink: 0; overflow-y: auto; }
+        ._main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-base); }
+        ._header { background: var(--bg-surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: var(--sp-2) var(--sp-4); justify-content: space-between; flex-wrap: wrap; gap: 10px;}
+        ._content { flex: 1; overflow: auto; padding: var(--sp-4); }
+        
+        ._navItem { padding: var(--sp-3) var(--sp-4); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-weight: 600; transition: all var(--dur) var(--ease); border-right: 3px solid transparent; }
+        ._navItem:hover { background: var(--bg-hover); color: var(--text-primary); }
+        ._navItem.active { background: var(--primary-subtle); color: var(--primary); border-right-color: var(--primary); }
+        
+        .nav-badge { background: var(--danger); color: white; padding: 2px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: bold; }
+
+        ._uploadGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-4); }
+        ._dropZone { border: 2px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--bg-surface); padding: var(--sp-6) var(--sp-4); text-align: center; cursor: pointer; transition: all var(--dur) var(--ease); display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; }
+        ._dropZone:hover { border-color: var(--primary); background: var(--primary-subtle); }
+        ._dropZone.has-file { border-style: solid; border-color: var(--success); background: var(--success-subtle); }
+        ._dropZone h3 { margin: 0 0 var(--sp-2) 0; color: var(--text-primary); font-size: var(--fs-md); }
+        ._dropZone p { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+        input[type="file"] { display: none; }
+        
+        .info-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--sp-4); margin-top: var(--sp-4); }
+        .info-card h4 { margin: 0 0 var(--sp-3) 0; color: var(--info); font-size: var(--fs-md); }
+        .info-card ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--sp-3); color: var(--text-secondary); }
+        .info-card li { display: flex; align-items: center; gap: var(--sp-3); line-height: 1.5; }
+        .info-badge-wrapper { flex-shrink: 0; width: 75px; text-align: center; }
+
+        .btn { border: none; padding: 8px 16px; border-radius: var(--radius-sm); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all var(--dur) var(--ease); }
+        .btn-primary { background: var(--primary); color: var(--on-primary); }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #0ea5e9; } /* مجرد تغيير تأثير عند الحفظ */
+        .btn-whatsapp { background: #25D366; color: #fff; padding: 6px 16px; border-radius: var(--radius-full); font-size: 12px; text-decoration: none; }
+        
+        .btn-theme { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .btn-theme:hover { background: var(--bg-hover); color: var(--text-primary); }
+        [data-theme="dark"] .icon-sun { display: block; }
+        [data-theme="dark"] .icon-moon { display: none; }
+        :root:not([data-theme="dark"]) .icon-sun { display: none; }
+        :root:not([data-theme="dark"]) .icon-moon { display: block; }
+
+        .header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .input-number, .filter-select { background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-primary); padding: 8px; border-radius: var(--radius-sm); font-family: inherit; font-size: 12.5px; outline: none; }
+        .input-number { width: 60px; text-align: center; }
+        .filter-select { min-width: 140px; cursor: pointer; }
+        
+        .search-box { position: relative; display: flex; align-items: center; }
+        .input-text { background: var(--bg-inset); border: 1px solid var(--border); color: var(--text-primary); padding: 8px 12px 8px 32px; border-radius: var(--radius-sm); width: 200px; font-family: inherit; font-size: 13px; }
+        .input-text:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-subtle); }
+        .search-icon { position: absolute; left: 10px; color: var(--text-muted); width: 16px; height: 16px; }
+
+        .report-age { font-size: 11px; font-weight: bold; padding: 4px 10px; border-radius: var(--radius-full); background: var(--warning-subtle); color: var(--warning); display: none; align-items: center; gap: 5px; }
+
+        ._tableWrapper { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: auto; background: var(--bg-surface); max-height: calc(100vh - 140px); }
+        
+        table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+        th, td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); border-left: 1px solid var(--border); vertical-align: middle; text-align: center; }
+        th { background: var(--bg-elevated); color: var(--text-secondary); font-weight: 700; position: sticky; top: 0; z-index: 10; white-space: nowrap; }
+        .name-cell { text-align: right; min-width: 220px; white-space: nowrap; }
+        tbody tr:hover { background: var(--bg-hover); }
+        
+        .badge { padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; display: inline-block; white-space: nowrap; }
+        .badge-danger { background: var(--danger-subtle); color: var(--danger); border: 1px solid var(--danger); }
+        .badge-warning { background: var(--warning-subtle); color: var(--warning); border: 1px solid var(--warning); }
+        .badge-success { background: var(--success-subtle); color: var(--success); border: 1px solid var(--success); }
+        .badge-info { background: var(--info-subtle); color: var(--info); border: 1px solid var(--info); }
+        
+        .hidden { display: none !important; }
+        .mono { font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: embed; white-space: nowrap; }
+        .nowrap { white-space: nowrap; }
+        
+        .course-card-wrapper { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-width: 300px; }
+        .course-card { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-inset); border: 1px solid var(--border); padding: 4px 10px; border-radius: var(--radius-md); font-size: 11.5px; }
+        .course-card .pct { font-weight: 800; font-family: Tahoma, monospace; direction: ltr; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
+        .course-card.c-danger { border-color: var(--danger); background: var(--danger-subtle); color: var(--danger); }
+        .course-card.c-warning { border-color: var(--warning); background: var(--warning-subtle); color: var(--warning); }
+        .course-card.c-success { border-color: var(--success); background: var(--success-subtle); color: var(--success); }
+        [data-theme="dark"] .course-card.c-danger, [data-theme="dark"] .course-card.c-warning, [data-theme="dark"] .course-card.c-success { color: #fff; }
+
+        .credits { font-size: 12px; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-strong); line-height: 1.6; }
+    </style>
+</head>
+<body data-theme="dark">
+
+<div class="_shell">
+    <div class="_sidebar">
+        <div style="padding: 0 var(--sp-4) var(--sp-4); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-2);">
+            <h2 style="margin: 0; color: var(--primary); font-size: var(--fs-lg);">نظام متابعة الغياب</h2>
+            <div class="credits">
+                <b>إعداد وتطوير:</b><br>
+                أ. منصور عبدالعزيز الفايز<br>
+                م. محمد يوسف الشبيلي
+            </div>
+        </div>
+        <div class="_navItem active" id="nav-upload" onclick="switchTab('upload', this, 'رفع البيانات')"><span>رفع البيانات</span></div>
+        <div class="_navItem" id="nav-main" onclick="switchTab('report-main', this)"><span>المتدربون</span></div>
+        <div class="_navItem" onclick="switchTab('report-matrix', this)"><span>مصفوفة الغياب</span></div>
+        <div class="_navItem" onclick="switchTab('report-percentages', this)"><span>نسبة الغياب والإنذارات</span></div>
+        <div class="_navItem" onclick="switchTab('report-fullweek', this)"><span>غياب أسبوع كامل فأكثر</span></div>
+        <div class="_navItem" id="nav-deprived-all" onclick="switchTab('report-deprived-all', this)">
+            <span>الحرمان بكل المقررات</span> <span class="nav-badge hidden" id="badge-all">0</span>
+        </div>
+        <div class="_navItem" id="nav-deprived-except" onclick="switchTab('report-deprived-except', this)">
+            <span>الحرمان ماعدا مقرر</span> <span class="nav-badge hidden" id="badge-except">0</span>
+        </div>
+        <div class="_navItem" id="nav-excluded" onclick="switchTab('report-excluded', this)"><span>المنسحبين والمطوي قيدهم</span></div>
+    </div>
+
+    <div class="_main">
+        <div class="_header">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <h3 id="pageTitle" style="margin: 0; min-width: 150px;">رفع البيانات</h3>
+                <div id="reportAgeIndicator" class="report-age">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span id="reportAgeText"></span>
+                </div>
+            </div>
+
+            <div class="header-controls">
+                <!-- التصفية المتقدمة -->
+                <select id="filterMajor" class="filter-select" onchange="filterTables()">
+                    <option value="">كل التخصصات</option>
+                </select>
+                
+                <select id="filterStatus" class="filter-select" onchange="filterTables()">
+                    <option value="">حالة الغياب (الكل)</option>
+                    <option value="absent">لديهم غياب مسجل</option>
+                    <option value="deprived">لديهم حرمان (ح)</option>
+                </select>
+
+                <div class="search-box">
+                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="searchInput" class="input-text" placeholder="بحث بالاسم أو الرقم..." onkeyup="filterTables()">
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <label style="font-size: 12px; color: var(--text-secondary);">الأسابيع:</label>
+                    <input type="number" id="totalWeeks" class="input-number" value="18" onchange="saveSettings(); processData();">
+                </div>
+
+                <button class="btn btn-success" onclick="exportToExcel()" title="تصدير الجدول المفتوح لإكسل">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    تصدير
+                </button>
+
+                <button class="btn-theme" id="themeToggle" title="تبديل المظهر">
+                    <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="_content">
+            <div id="upload" class="tab-content">
+                <div class="_uploadGrid">
+                    <div class="_dropZone" id="drop-sf01" onclick="document.getElementById('file-sf01').click()">
+                        <h3>تقرير SF01</h3>
+                        <p id="desc-sf01">قائمة المتدربين المسجلين</p>
+                        <input type="file" id="file-sf01" accept=".xls,.xlsx,.csv" onchange="handleFile(event, 'sf01')">
+                    </div>
+                    <div class="_dropZone" id="drop-ss01" onclick="document.getElementById('file-ss01').click()">
+                        <h3>تقرير SS01</h3>
+                        <p>جداول الوحدة التدريبية</p>
+                        <input type="file" id="file-ss01" accept=".xls,.xlsx,.csv" onchange="handleFile(event, 'ss01')">
+                    </div>
+                    <div class="_dropZone" id="drop-so04" onclick="document.getElementById('file-so04').click()">
+                        <h3>تقرير SO04</h3>
+                        <p>التقرير التاريخي للغياب</p>
+                        <input type="file" id="file-so04" accept=".xls,.xlsx,.csv" onchange="handleFile(event, 'so04')">
+                    </div>
+                </div>
+
+                <div class="info-card">
+                    <h4>دليل وقراءة حالات ونسب الغياب:</h4>
+                    <ul>
+                        <li><div class="info-badge-wrapper"><span class="badge badge-danger">كامل</span></div> <div id="legend-full">المتدرب غاب 100% عن جميع مقرراته المسجلة في ذلك الأسبوع.</div></li>
+                        <li><div class="info-badge-wrapper"><span class="badge badge-warning">جزئي</span></div> <div id="legend-partial">المتدرب غاب عن بعض المقررات ولكنه حضر في أخرى بنفس الأسبوع.</div></li>
+                        <li><div class="info-badge-wrapper"><span class="badge badge-info">محتمل</span></div> <div id="legend-prob">لم يُسجل أي غياب ولم يقم أي مدرب بالتحضير.</div></li>
+                        <li><div class="info-badge-wrapper"><span style="color:var(--text-muted); font-weight:bold;">-</span></div> <div id="legend-present">حاضر (تم تحضيره في محاضرة واحدة على الأقل ولم يسجل غياب).</div></li>
+                        <li><div class="info-badge-wrapper"><span class="badge badge-danger">حرمان (ح)</span></div> <div id="legend-deprived">تجاوز الحد المسموح وتم رصد درجة الحرمان (ح).</div></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div id="report-main" class="tab-content hidden"><div class="_tableWrapper" id="table-main"></div></div>
+            <div id="report-matrix" class="tab-content hidden"><div class="_tableWrapper" id="table-matrix"></div></div>
+            <div id="report-percentages" class="tab-content hidden"><div class="_tableWrapper" id="table-percentages"></div></div>
+            <div id="report-fullweek" class="tab-content hidden"><div class="_tableWrapper" id="table-fullweek"></div></div>
+            <div id="report-deprived-all" class="tab-content hidden"><div class="_tableWrapper" id="table-deprived-all"></div></div>
+            <div id="report-deprived-except" class="tab-content hidden"><div class="_tableWrapper" id="table-deprived-except"></div></div>
+            <div id="report-excluded" class="tab-content hidden"><div class="_tableWrapper" id="table-excluded"></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- حفظ واسترجاع الإعدادات ---
+    const body = document.body;
+    body.setAttribute('data-theme', localStorage.getItem('appTheme') || 'dark');
+    if(localStorage.getItem('appWeeks')) document.getElementById('totalWeeks').value = localStorage.getItem('appWeeks');
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        const newTheme = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('appTheme', newTheme);
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", newTheme === 'dark' ? "#14191c" : "#eef4f5");
+    });
+
+    function saveSettings() {
+        localStorage.setItem('appWeeks', document.getElementById('totalWeeks').value);
+    }
+
+    var rawData = { sf01: [], ss01: [], so04: [] };
+    var processedData = { active: [], excluded: [], percentages: [] };
+    var courseHours = {}; 
+    var isFemale = false; 
+
+    window.switchTab = function(tabId, el, titleOverride) {
+        document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
+        document.getElementById(tabId).classList.remove('hidden');
+        
+        document.querySelectorAll('._navItem').forEach(e => e.classList.remove('active'));
+        if (el) { el.classList.add('active'); document.getElementById('pageTitle').innerText = el.querySelector('span').innerText; } 
+        else if (titleOverride) { document.getElementById('pageTitle').innerText = titleOverride; }
+    };
+
+    window.exportToExcel = function() {
+        let activeTab = document.querySelector('.tab-content:not(.hidden)');
+        if(activeTab.id === 'upload') return alert('الرجاء فتح أحد التقارير أولاً لتصديره');
+        
+        let table = activeTab.querySelector('table');
+        if(!table) return alert('لا توجد بيانات للتصدير');
+
+        let wb = XLSX.utils.table_to_book(table, {sheet: "التقرير"});
+        XLSX.writeFile(wb, `${document.getElementById('pageTitle').innerText}.xlsx`);
+    };
+
+    window.handleFile = function(e, type) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        let dropZone = document.getElementById(`drop-${type}`);
+        dropZone.classList.add('has-file');
+        dropZone.querySelector('p').innerText = file.name;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            const data = new Uint8Array(evt.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            rawData[type] = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {defval: ""});
+            window.processData();
+        };
+        reader.readAsArrayBuffer(file);
+    };
+
+    window.calculateContactHours = function(timeStr) {
+        if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes('-')) return 0;
+        let p = timeStr.split('-');
+        let t1 = p[0].replace(/\D/g,''), t2 = p[1].replace(/\D/g,'');
+        if(t1.length < 3 || t2.length < 3) return 0;
+        let m1 = (parseInt(t1.substring(0, t1.length-2))*60) + parseInt(t1.substring(t1.length-2));
+        let m2 = (parseInt(t2.substring(0, t2.length-2))*60) + parseInt(t2.substring(t2.length-2));
+        return Math.round(Math.abs(m1 - m2) / 50); 
+    };
+
+    // --- التصفية والفرز المتقدم ---
+    window.filterTables = function() {
+        let textFilter = document.getElementById('searchInput').value.trim().toLowerCase();
+        let majorFilter = document.getElementById('filterMajor').value;
+        let statusFilter = document.getElementById('filterStatus').value;
+        
+        let tabs = ['table-main', 'table-matrix', 'table-percentages', 'table-fullweek', 'table-deprived-all', 'table-deprived-except', 'table-excluded'];
+        
+        tabs.forEach(tabId => {
+            let table = document.querySelector(`#${tabId} table`);
+            if (table) {
+                table.querySelectorAll('tbody tr').forEach(tr => {
+                    let idVal = (tr.cells[0]?.textContent || '').toLowerCase();
+                    let nameVal = (tr.cells[1]?.textContent || '').toLowerCase();
+                    
+                    let trMajor = tr.getAttribute('data-major') || '';
+                    let trHasAbsent = tr.getAttribute('data-has-absent') === 'yes';
+                    let trHasDeprived = tr.getAttribute('data-has-deprived') === 'yes';
+
+                    let matchText = (idVal.includes(textFilter) || nameVal.includes(textFilter));
+                    let matchMajor = (majorFilter === "" || trMajor === majorFilter);
+                    
+                    let matchStatus = true;
+                    if(statusFilter === 'absent' && !trHasAbsent) matchStatus = false;
+                    if(statusFilter === 'deprived' && !trHasDeprived) matchStatus = false;
+
+                    tr.style.display = (matchText && matchMajor && matchStatus) ? "" : "none";
+                });
+            }
+        });
+    };
+
+    window.updateUIText = function() {
+        document.getElementById('nav-main').querySelector('span').innerText = isFemale ? 'المتدربات' : 'المتدربون';
+        document.getElementById('nav-excluded').querySelector('span').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبين والمطوي قيدهم';
+    };
+
+    // --- تحليل عمر التقرير ---
+    function checkReportAge() {
+        if(rawData.so04.length === 0) return;
+        let maxDate = null;
+        
+        rawData.so04.forEach(row => {
+            let dStr = row['تاريخ المحاضرة']; // Formats usually DD/MM/YYYY
+            if(dStr) {
+                let parts = dStr.split(/[-/]/);
+                if(parts.length === 3) {
+                    let year = parts[2].length === 2 ? "20"+parts[2] : parts[2];
+                    let d = new Date(`${year}-${parts[1]}-${parts[0]}`);
+                    if(!maxDate || d > maxDate) maxDate = d;
+                }
+            }
+        });
+
+        if(maxDate) {
+            let diffDays = Math.floor((new Date() - maxDate) / (1000 * 60 * 60 * 24));
+            let ind = document.getElementById('reportAgeIndicator');
+            ind.style.display = 'flex';
+            
+            if(diffDays <= 3) {
+                ind.style.background = 'var(--success-subtle)';
+                ind.style.color = 'var(--success)';
+                document.getElementById('reportAgeText').innerText = 'بيانات حديثة';
+            } else {
+                ind.style.background = 'var(--warning-subtle)';
+                ind.style.color = 'var(--warning)';
+                document.getElementById('reportAgeText').innerText = `البيانات قديمة (${diffDays} أيام)`;
+            }
+        }
+    }
+
+    window.processData = function() {
+        if (rawData.sf01.length === 0 || rawData.ss01.length === 0 || rawData.so04.length === 0) return;
+
+        checkReportAge();
+        isFemale = rawData.ss01.some(r => (r['الوحدة التدريبية']||r['الوحدة']||'').includes('بنات'));
+        window.updateUIText();
+
+        const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
+        courseHours = {}; let crnUniqueSessions = {}; 
+        
+        rawData.ss01.forEach(row => {
+            let crn = row['الرقم المرجعي'] || row['CRN'];
+            let time = row['الوقت'] || row['فترة المحاضرة'];
+            let day = row['اليوم'] || '';
+            
+            if (crn && time && day) {
+                let uKey = day.trim() + '_' + time.trim();
+                if (!crnUniqueSessions[crn]) crnUniqueSessions[crn] = new Set();
+                if (!crnUniqueSessions[crn].has(uKey)) {
+                    crnUniqueSessions[crn].add(uKey);
+                    courseHours[crn] = (courseHours[crn] || 0) + window.calculateContactHours(time);
+                }
+            }
+        });
+
+        rawData.ss01.forEach(row => {
+            let crn = row['الرقم المرجعي'] || row['CRN'], ch = row['ساعات الاتصال'];
+            if (crn && !courseHours[crn] && ch !== undefined && ch !== "") courseHours[crn] = parseFloat(ch);
+        });
+
+        let TTH = {}; let globalSessionStatus = {}; 
+        rawData.so04.forEach(row => {
+            let crn = row['الرقم المرجعي'], w = parseInt(row['رقم الأسبوع']), abs = parseFloat(row['ساعات الغياب']) || 0;
+            if(!crn || isNaN(w) || abs <= 0) return;
+            let key = (row['تاريخ المحاضرة']||'') + '_' + (row['فترة المحاضرة']||'');
+            
+            if(!globalSessionStatus[crn]) globalSessionStatus[crn] = {};
+            if(!globalSessionStatus[crn][w]) globalSessionStatus[crn][w] = {};
+            
+            globalSessionStatus[crn][w][key] = {
+                absHours: Math.max((globalSessionStatus[crn][w][key]?.absHours || 0), abs),
+                excuse: row['نوع العذر'] || ''
+            };
+        });
+
+        for(let c in globalSessionStatus) {
+            for(let w in globalSessionStatus[c]) {
+                if(!TTH[w]) TTH[w] = {};
+                let sum = 0;
+                for(let key in globalSessionStatus[c][w]) {
+                    if (!globalSessionStatus[c][w][key].excuse.includes('جلسة ملغاة')) sum += globalSessionStatus[c][w][key].absHours;
+                }
+                TTH[w][c] = sum;
+            }
+        }
+
+        let traineesMap = {}; let allMajors = new Set();
+        rawData.sf01.forEach(row => {
+            let id = row['رقم المتدرب'] || row['رقم المتدربة'];
+            if(!id) return;
+            
+            if(!traineesMap[id]) {
+                traineesMap[id] = {
+                    id: id, name: row['إسم المتدرب']||row['اسم المتدرب']||row['إسم المتدربة']||row['اسم المتدربة'],
+                    major: row['التخصص'], phone: row['رقم الجوال'],
+                    regStatus: row['حالة تسجيل']||'', traineeStatus: row['حالة المتدرب']||row['حالة المتدربة']||'',
+                    crns: {}, courseCodes: new Set(), weeklyCrnAbsences: {}, weekStatuses: {},
+                    weeksAbsentCount: 0, totalUniqueCourses: 0, totalDeprivedCourses: 0
+                };
+            }
+            
+            let crn = row['الرقم المرجعي'], code = row['المقرر'];
+            let isExcluded = traineesMap[id].regStatus.includes('انسحاب') || traineesMap[id].regStatus.includes('مطوي');
+            let isDep = (row['الدرجة']?.toString().trim() === 'ح');
+
+            if(crn && code && !isExcluded) {
+                traineesMap[id].courseCodes.add(code);
+                allMajors.add(traineesMap[id].major); // استخراج التخصصات
+                if (!traineesMap[id].crns[crn]) {
+                    traineesMap[id].crns[crn] = { code: code, name: row['اسم المقرر']||row['عنوان المقرر'], hours: courseHours[crn]||0, absHours: 0, isDeprived: isDep };
+                } else if (isDep) traineesMap[id].crns[crn].isDeprived = true;
+            }
+        });
+
+        // تعبئة قائمة التخصصات
+        let majorSelect = document.getElementById('filterMajor');
+        majorSelect.innerHTML = '<option value="">كل التخصصات</option>';
+        Array.from(allMajors).sort().forEach(m => { if(m) majorSelect.innerHTML += `<option value="${m}">${m}</option>`; });
+
+        let tSessionStat = {}; 
+        rawData.so04.forEach(row => {
+            let id = row['رقم المتدرب']||row['رقم المتدربة'], crn = row['الرقم المرجعي'], w = parseInt(row['رقم الأسبوع']), abs = parseFloat(row['ساعات الغياب'])||0;
+            if(!id || !crn || !traineesMap[id]?.crns[crn] || isNaN(w) || abs===0) return;
+            
+            let key = w + '_' + (row['تاريخ المحاضرة']||'') + '_' + (row['فترة المحاضرة']||'');
+            if(!tSessionStat[id]) tSessionStat[id] = {};
+            if(!tSessionStat[id][crn]) tSessionStat[id][crn] = {};
+            
+            tSessionStat[id][crn][key] = { w: w, abs: Math.max((tSessionStat[id][crn][key]?.abs || 0), abs), ex: row['نوع العذر']||'' };
+        });
+
+        Object.keys(tSessionStat).forEach(id => Object.keys(tSessionStat[id]).forEach(crn => Object.keys(tSessionStat[id][crn]).forEach(k => {
+            let s = tSessionStat[id][crn][k];
+            if(!traineesMap[id].weeklyCrnAbsences[s.w]) traineesMap[id].weeklyCrnAbsences[s.w] = {};
+            if(!traineesMap[id].weeklyCrnAbsences[s.w][crn]) traineesMap[id].weeklyCrnAbsences[s.w][crn] = { unex: 0, canc: 0 };
+
+            if(s.ex.includes('بدون عذر')) { traineesMap[id].crns[crn].absHours += s.abs; traineesMap[id].weeklyCrnAbsences[s.w][crn].unex += s.abs; }
+            else if (s.ex.includes('جلسة ملغاة')) traineesMap[id].weeklyCrnAbsences[s.w][crn].canc += s.abs;
+        })));
+
+        processedData.active = []; processedData.excluded = []; processedData.percentages = [];
+
+        Object.values(traineesMap).forEach(t => {
+            let fullyEx = t.regStatus.includes('انسحاب') || t.regStatus.includes('مطوي') || t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي');
+            if(fullyEx || t.courseCodes.size === 0) { t.totalUniqueCourses = t.courseCodes.size; processedData.excluded.push(t); return; }
+
+            let depCodes = new Set(); 
+            Object.keys(t.crns).forEach(crn => {
+                let c = t.crns[crn], tHrs = c.hours * totalWeeks;
+                if (c.isDeprived) depCodes.add(c.code);
+                c.pct = tHrs > 0 ? (c.absHours / tHrs) * 100 : 0;
+
+                if(c.pct > 0) processedData.percentages.push({ tName: t.name, tId: t.id, ph: t.phone, cCode: c.code, cName: c.name, crn: crn, pct: c.pct, isDep: c.isDeprived, major: t.major });
+            });
+
+            t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = depCodes.size; t.weeksAbsentCount = 0;
+            let activeCrns = Object.keys(t.crns);
+
+            for(let w=1; w<=totalWeeks; w++) {
+                let absCrns = 0, fullAbsCrns = 0, expCrns = 0, taught = false;
+                activeCrns.forEach(crn => {
+                    let tHrs = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0;
+                    let wD = t.weeklyCrnAbsences[w]?.[crn], unex = wD?.unex||0, canc = wD?.canc||0;
+                    let expHrs = Math.max(0, (t.crns[crn].hours > 0 ? t.crns[crn].hours : tHrs) - canc);
+
+                    if (expHrs > 0 || tHrs > 0) expCrns++;
+                    if (tHrs > 0) taught = true;
+                    if (unex > 0) {
+                        absCrns++;
+                        if (expHrs === 0 || unex >= expHrs) fullAbsCrns++;
+                    }
+                });
+
+                if (expCrns === 0) t.weekStatuses[w] = "-";
+                else if (absCrns > 0) { t.weekStatuses[w] = (fullAbsCrns > 0 && fullAbsCrns === expCrns) ? "كامل" : "جزئي"; t.weeksAbsentCount++; }
+                else if (taught) t.weekStatuses[w] = "-"; 
+                else t.weekStatuses[w] = "محتمل";
+            }
+            processedData.active.push(t);
+        });
+
+        processedData.percentages.sort((a, b) => b.pct - a.pct);
+        window.renderTables(totalWeeks);
+    };
+
+    window.renderTables = function(totalWeeks) {
+        let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب', colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب';
+
+        const createThead = (isEx = false) => {
+            let html = `<thead><tr><th>${colId}</th><th class="name-cell">${colName}</th><th>التخصص</th>`;              
+            if(isEx) html += `<th>حالة المتدرب</th><th>حالة التسجيل</th>`;
+            else {
+                html += `<th>عدد المقررات</th><th>مقررات الحرمان</th><th>أسابيع الغياب</th>`;
+                for(let w=1; w<=totalWeeks; w++) html += `<th class="nowrap">الأسبوع (${w})</th>`;
+            }
+            return html + `</tr></thead>`;
+        };
+
+        const createRow = (t, isEx = false) => {
+            // إضافة خصائص البيانات (Data Attributes) لعملية الفرز
+            let trAttr = `data-major="${t.major || ''}" data-has-absent="${t.weeksAbsentCount > 0 ? 'yes' : 'no'}" data-has-deprived="${t.totalDeprivedCourses > 0 ? 'yes' : 'no'}"`;
+            
+            let html = `<tr ${trAttr}>
+                <td class="mono">${t.id}</td><td class="name-cell">${t.name}</td><td>${t.major || '-'}</td>`;
+            
+            if(isEx) html += `<td>${t.traineeStatus||'-'}</td><td>${t.regStatus||'-'}</td>`;
+            else {
+                let badgeWeeks = t.weeksAbsentCount === 0 ? '<span style="color:var(--text-muted); font-weight:bold;">-</span>' : `<span class="badge badge-warning">${t.weeksAbsentCount}</span>`;
+                html += `
+                <td>${t.totalUniqueCourses||0}</td>
+                <td><span class="badge ${t.totalDeprivedCourses>0?'badge-danger':'badge-success'}">${t.totalDeprivedCourses||0}</span></td>
+                <td>${badgeWeeks}</td>`;
+                
+                for(let w=1; w<=totalWeeks; w++) {
+                    let st = t.weekStatuses[w], b = '';
+                    if(st==='كامل') b='<span class="badge badge-danger">كامل</span>'; else if(st==='محتمل') b='<span class="badge badge-info">محتمل</span>'; else if(st==='جزئي') b='<span class="badge badge-warning">جزئي</span>'; else b='<span style="color:var(--text-muted); font-weight:bold;">-</span>';
+                    html += `<td>${b}</td>`;
+                }
+            }
+            return html + `</tr>`;
+        };
+
+        // تحديث الجداول
+        document.getElementById('table-main').innerHTML = `<table>${createThead(false)}<tbody>${processedData.active.map(t=>createRow(t,false)).join('')}</tbody></table>`;
+        
+        // مصفوفة الغياب
+        let hMat = `<table><thead><tr><th>${colId}</th><th class="name-cell">${colName}</th><th>التخصص</th><th>المقررات المسجلة ونسبة غياب كل مقرر</th></tr></thead><tbody>`;
+        processedData.active.forEach(t => {
+            hMat += `<tr data-major="${t.major||''}" data-has-absent="${t.weeksAbsentCount>0?'yes':'no'}" data-has-deprived="${t.totalDeprivedCourses>0?'yes':'no'}">
+                <td class="mono">${t.id}</td><td class="name-cell">${t.name}</td><td>${t.major||'-'}</td><td><div class="course-card-wrapper">`;
+            Object.values(t.crns).forEach(c => {
+                let cls = c.isDeprived?'c-danger':c.pct>=20?'c-danger':c.pct>=15?'c-warning':'c-success';
+                let txt = c.isDeprived ? `${isFemale?'محرومة':'محروم'} | ${c.pct.toFixed(1)}%` : `${c.pct.toFixed(1)}%`;
+                hMat += `<div class="course-card ${cls}"><span>${c.name}</span><span class="pct">${txt}</span></div>`;
+            });
+            hMat += `</div></td></tr>`;
+        });
+        document.getElementById('table-matrix').innerHTML = hMat + `</tbody></table>`;
+
+        // القوائم المنفصلة
+        let fullWk = processedData.active.filter(t => Object.values(t.weekStatuses).includes('كامل'));
+        document.getElementById('table-fullweek').innerHTML = `<table>${createThead(false)}<tbody>${fullWk.map(t=>createRow(t,false)).join('')}</tbody></table>`;
+
+        let depAll = processedData.active.filter(t => t.totalUniqueCourses > 0 && t.totalDeprivedCourses === t.totalUniqueCourses);
+        document.getElementById('table-deprived-all').innerHTML = `<table>${createThead(false)}<tbody>${depAll.map(t=>createRow(t,false)).join('')}</tbody></table>`;
+        
+        let depExc = processedData.active.filter(t => t.totalUniqueCourses > 1 && t.totalDeprivedCourses === (t.totalUniqueCourses - 1));
+        document.getElementById('table-deprived-except').innerHTML = `<table>${createThead(false)}<tbody>${depExc.map(t=>createRow(t,false)).join('')}</tbody></table>`;
+
+        document.getElementById('table-excluded').innerHTML = `<table>${createThead(true)}<tbody>${processedData.excluded.map(t=>createRow(t,true)).join('')}</tbody></table>`;
+
+        // تحديث عدادات القائمة الجانبية
+        let bAll = document.getElementById('badge-all'), bExc = document.getElementById('badge-except');
+        if(depAll.length > 0) { bAll.innerText = depAll.length; bAll.classList.remove('hidden'); } else bAll.classList.add('hidden');
+        if(depExc.length > 0) { bExc.innerText = depExc.length; bExc.classList.remove('hidden'); } else bExc.classList.add('hidden');
+
+        // جدول النسب
+        let hPct = `<table><thead><tr><th>${colId}</th><th class="name-cell">${colName}</th><th>التخصص</th><th>المقرر</th><th>الشعبة</th><th>نسبة الغياب</th><th>الحالة</th><th>الإجراء</th></tr></thead><tbody>`;
+        processedData.percentages.forEach(p => {
+            let ph = p.ph ? p.ph.toString().replace(/\s+/g, '').replace(/^05/, '9665').replace(/^5/, '9665') : "";
+            let url = `https://api.whatsapp.com/send?phone=${ph}&text=${encodeURIComponent(`عزيزي المتدرب ${p.tName}\nنسبة غيابك في مقرر ${p.cName} بلغت ${p.pct.toFixed(1)}%`)}`;
+            let st = p.isDep ? `<span class="badge badge-danger">حرمان</span>` : p.pct>=20 ? '<span class="badge badge-danger">تجاوز 20%</span>' : p.pct>=15 ? '<span class="badge badge-warning">إنذار</span>' : '<span class="badge badge-success">طبيعي</span>';
+            hPct += `<tr data-major="${p.major||''}" data-has-absent="yes" data-has-deprived="${p.isDep?'yes':'no'}">
+                <td class="mono">${p.tId}</td><td class="name-cell">${p.tName}</td><td>${p.major||'-'}</td><td>${p.cName}</td><td class="mono">${p.crn}</td>
+                <td class="mono" style="color: ${p.pct>=15?'var(--danger)':'inherit'}; font-weight: bold;">${p.pct.toFixed(1)}%</td>
+                <td>${st}</td><td><a href="${url}" target="_blank" class="btn-whatsapp">واتساب</a></td></tr>`;
+        });
+        document.getElementById('table-percentages').innerHTML = hPct + `</tbody></table>`;
+
+        window.filterTables();
+    };
+</script>
+</body>
+</html>
