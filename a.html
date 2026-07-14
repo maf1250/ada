@@ -1167,10 +1167,10 @@ window.renderDashboard = function() {
     // حساب متوسط الغياب
     let allAbsPercentages = processedData.percentages.map(p => p.absPercentage);
 let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=>a+b,0) / allAbsPercentages.length) : 0;
-    // --- [هام] تعريف بيانات الرسم البياني الدائري ---
-    let statusCounts = { "نشط": totalActive };
-    processedData.excluded.forEach(t => {
-        let s = t.traineeStatus || "أخرى";
+// تجميع الحالات الفعلية كما وردت في النظام لكل المتدربين (النشطين والمستبعدين)
+    let statusCounts = {};
+    [...processedData.active, ...processedData.excluded].forEach(t => {
+        let s = t.traineeStatus && t.traineeStatus.trim() !== "" ? t.traineeStatus : "غير محدد";
         statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
