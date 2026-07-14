@@ -1275,57 +1275,74 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
                     <tbody>
     `;
 
-    // تحليل التخصصات
-    let majors = [...new Set(processedData.active.map(t => t.major))].sort();
-    majors.forEach(m => {
-        let mActive = processedData.active.filter(t => t.major === m);
-        let mDeprived = mActive.filter(t => t.totalDeprivedCourses > 0).length;
-        let mOver20 = new Set(processedData.percentages.filter(p => p.major === m && p.absPercentage >= 20).map(p => p.traineeId)).size;
-        let mPercs = processedData.percentages.filter(p => p.major === m).map(p => p.absPercentage);
-let mAvg = mPercs.length > 0 ? (mPercs.reduce((a,b)=>a+b,0) / mPercs.length) : 0;        
-        let riskScore = ((mDeprived/mActive.length)*40) + ((mOver20/mActive.length)*30) + (Math.min(mAvg, 30));
-        let riskClass = riskScore > 25 ? 'risk-high' : (riskScore > 15 ? 'risk-med' : '');
+ // --- 1. تجميع البيانات (تحسين الأداء: المرور على البيانات مرة واحدة فقط) ---
+    let majorDataMap = {};
+    processedData.active.forEach(t => {
+        if (!majorDataMap[t.major]) majorDataMap[t.major] = { count: 0, deprived: 0, over20: 0, sumPct: 0, pctCount: 0 };
+        majorDataMap[t.major].count++;
+        if (t.totalDeprivedCourses > 0) majorDataMap[t.major].deprived++;
+    });
+
+    let courseStats = {};
+    processedData.percentages.forEach(p => {
+        // حسابات التخصصات
+        if (majorDataMap[p.major]) {
+            if (p.absPercentage >= 20) majorDataMap[p.major].over20++;
+            majorDataMap[p.major].sumPct += p.absPercentage;
+            majorDataMap[p.major].pctCount++;
+        }
+        // حسابات المقررات
+        if (!courseStats[p.courseName]) courseStats[p.courseName] = { deprived: 0, over20: 0 };
+        if (p.isDeprived) courseStats[p.courseName].deprived++;
+        if (p.absPercentage >= 20) courseStats[p.courseName].over20++;
+    });
+
+    // --- 2. بناء جدول التخصصات ---
+    Object.keys(majorDataMap).sort().forEach(m => {
+        const stats = majorDataMap[m];
+        const safeActiveCount = Math.max(stats.count, 1); // حماية من القسمة على صفر
+        const safePctCount = Math.max(stats.pctCount, 1);
+        
+        const mAvg = stats.sumPct / safePctCount;
+        const riskScore = ((stats.deprived / safeActiveCount) * 40) + 
+                          ((stats.over20 / safeActiveCount) * 30) + 
+                          Math.min(mAvg, 30);
+
+        const riskClass = riskScore > 25 ? 'risk-high' : (riskScore > 15 ? 'risk-med' : '');
 
         html += `
             <tr class="${riskClass}">
                 <td style="cursor:pointer; color:var(--primary); font-weight:bold;" onclick="drillDown('major', '${m}')">${m}</td>
-                <td class="text-center mono">${mActive.length}</td>
-                <td class="text-center mono">${mDeprived}</td>
-                <td class="text-center mono">${mOver20}</td>
+                <td class="text-center mono">${stats.count}</td>
+                <td class="text-center mono">${stats.deprived}</td>
+                <td class="text-center mono">${stats.over20}</td>
                 <td class="text-center mono">${mAvg.toFixed(1)}%</td>
                 <td class="text-center"><span class="badge ${riskScore > 25 ? 'badge-danger' : (riskScore > 15 ? 'badge-warning' : 'badge-success')}">${riskScore.toFixed(0)}</span></td>
-            </tr>
-        `;
+            </tr>`;
     });
     html += `</tbody></table></div></div>`;
 
-    // تحليل المدربين والمقررات
+    // --- 3. تحليل المدربين ---
     let instNameMap = {};
     rawData.ss01.forEach(row => {
-        let id = row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'];
-        let name = row['إسم المدرب'] || row['اسم المدرب'] || row['إسم المدربة'] || row['اسم المدربة'];
-        if (id && name) instNameMap[id.toString().trim()] = name.toString().trim();
+        let id = (row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'])?.toString().trim();
+        let name = (row['إسم المدرب'] || row['اسم المدرب'] || row['إسم المدربة'] || row['اسم المدربة'])?.toString().trim();
+        if (id && name) instNameMap[id] = name;
     });
 
     let instructorAbs = {};
     rawData.so04.forEach(row => {
-        let instId = row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'];
+        let instId = (row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'])?.toString().trim();
         let hours = parseFloat(row['ساعات الغياب']) || 0;
         if (instId && hours > 0) {
-            let idStr = instId.toString().trim();
-            instructorAbs[idStr] = (instructorAbs[idStr] || 0) + 1;
+            instructorAbs[instId] = (instructorAbs[instId] || 0) + 1;
         }
     });
-    let sortedInst = Object.entries(instructorAbs).sort((a,b) => b[1] - a[1]).slice(0, 5);
 
-    let courseStats = {};
-    processedData.percentages.forEach(p => {
-        if(!courseStats[p.courseName]) courseStats[p.courseName] = { deprived: 0, over20: 0 };
-        if(p.isDeprived) courseStats[p.courseName].deprived++;
-        if(p.absPercentage >= 20) courseStats[p.courseName].over20++;
-    });
+    let sortedInst = Object.entries(instructorAbs).sort((a,b) => b[1] - a[1]).slice(0, 5);
     let sortedCourses = Object.entries(courseStats).sort((a,b) => b[1].over20 - a[1].over20).slice(0, 5);
 
+    // --- 4. بناء الجداول السفلية ---
     html += `
         <div class="admin-grid">
             <div class="admin-card">
@@ -1342,13 +1359,11 @@ let mAvg = mPercs.length > 0 ? (mPercs.reduce((a,b)=>a+b,0) / mPercs.length) : 0
                 <table>
                     <thead><tr><th>${txt.instructor}</th><th class="text-center">عدد الحالات</th></tr></thead>
                     <tbody>
-                        ${sortedInst.map(([id, val]) => `<tr><td>${instNameMap[id] || (txt.instructor + ' ' + id)}</td><td class="text-center mono">${val}</td></tr>`).join('')}
+                        ${sortedInst.length > 0 ? sortedInst.map(([id, val]) => `<tr><td>${instNameMap[id] || (txt.instructor + ' ' + id)}</td><td class="text-center mono">${val}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا توجد بيانات</td></tr>'}
                     </tbody>
                 </table>
             </div>
-        </div>
-    `;
-
+        </div>`;
     document.getElementById('dashboard-content').innerHTML = html;
 
     // 5. رسم المخططات البيانية
