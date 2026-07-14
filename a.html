@@ -40,8 +40,8 @@
             --warning-subtle: #f59e0b26;
             --danger: #ef4444;
             --danger-subtle: #ef444426;
-            --info: #3b82f626;
             --info: #3b82f6;
+            --info-subtle: #3b82f626;
             --font-family: "Cairo", sans-serif;
             --fs-xs: .6875rem; --fs-sm: .75rem; --fs-base: .8125rem; --fs-md: .875rem; --fs-lg: 1rem; --fs-xl: 1.25rem; --fs-2xl: 1.5rem;
             --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
@@ -411,9 +411,6 @@
 </div>
 
 <script>
-    // مراجع عالمية للرسوم البيانية لمنع التكرار وتسريب الذاكرة
-let statusChartInst = null;
-let weeklyChartInst = null;
 // تحديد الثيم
 const themeBtn = document.getElementById('themeToggle');
 const rootElement = document.documentElement; 
@@ -496,27 +493,25 @@ themeBtn.addEventListener('click', () => {
         localStorage.setItem('abs_reports_settings', JSON.stringify(settings));
     }
 
-window.switchTab = function(tabId, el, titleOverride) {
-    document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
-    document.getElementById(tabId).classList.remove('hidden');
-    
-    document.querySelectorAll('._navItem').forEach(e => e.classList.remove('active'));
-    
-    if (el) {
-        el.classList.add('active');
-        let spanTitle = el.querySelector('span:first-child');
-        document.getElementById('pageTitle').innerText = spanTitle ? spanTitle.innerText : el.innerText;
-    }
-
-    // تنظيف وإعادة رسم لوحة الإحصائيات عند الدخول إليها
-    if(tabId === 'report-dashboard') {
-        if (processedData.active.length > 0) {
-            setTimeout(() => renderDashboard(), 50);
-        } else {
-            document.getElementById('dashboard-content').innerHTML = '<div style="padding:40px; text-align:center; color:var(--text-muted);">لا توجد بيانات كافية لعرض الإحصائيات. نأمل رفع الملفات أولاً.</div>';
+    window.switchTab = function(tabId, el, titleOverride) {
+        document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
+        document.getElementById(tabId).classList.remove('hidden');
+        
+        document.querySelectorAll('._navItem').forEach(e => e.classList.remove('active'));
+        
+        if (el) {
+            el.classList.add('active');
+            let spanTitle = el.querySelector('span:first-child');
+            document.getElementById('pageTitle').innerText = spanTitle ? spanTitle.innerText : el.innerText;
+        } else if (titleOverride) {
+            document.getElementById('pageTitle').innerText = titleOverride;
         }
-    }
-};
+        
+        // إعادة تهيئة الرسوم البيانية عند العودة للإحصائيات
+        if(tabId === 'report-dashboard' && processedData.active.length > 0) {
+            setTimeout(() => renderDashboard(), 50);
+        }
+    };
 
     window.renderFileDate = function(type, fDate) {
         let dateEl = document.getElementById(`date-${type}`);
@@ -1154,110 +1149,249 @@ window.switchTab = function(tabId, el, titleOverride) {
 
 window.renderDashboard = function() {
     const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
-    const dashboardContainer = document.getElementById('dashboard-content');
-    if (!dashboardContainer) return;
-
-    // --- 1. تجهيز البيانات (مرور واحد للأداء) ---
-    let statusCounts = { "منتظم": 0, "جزئي": 0, "كامل": 0, "محتمل": 0 };
-    let weeklyFull = Array(totalWeeks).fill(0);
-    let weeklyPartial = Array(totalWeeks).fill(0);
-    let deprivedCount = 0;
-
-    processedData.active.forEach(t => {
-        const statuses = Object.values(t.weekStatuses || {});
-        if (statuses.includes('كامل')) statusCounts["كامل"]++;
-        else if (statuses.includes('جزئي')) statusCounts["جزئي"]++;
-        else if (statuses.includes('محتمل')) statusCounts["محتمل"]++;
-        else statusCounts["منتظم"]++;
-
-        if ((t.totalDeprivedCourses || 0) > 0) deprivedCount++;
-
-        for(let w=1; w<=totalWeeks; w++) {
-            let s = (t.weekStatuses || {})[w];
-            if(s === 'كامل') weeklyFull[w-1]++;
-            else if(s === 'جزئي') weeklyPartial[w-1]++;
-        }
+    
+    // 1. حساب الـ KPIs الأساسية
+    let totalActive = processedData.active.length;
+    let totalExcluded = processedData.excluded.length;
+    let majorsCount = new Set(processedData.active.concat(processedData.excluded).map(t => t.major)).size;
+    let crnsCount = new Set(rawData.ss01.map(r => r['الرقم المرجعي'] || r['CRN'])).size;
+    let coursesCount = new Set(rawData.ss01.map(r => r['المقرر'])).size;
+    
+    let withdrawn = processedData.excluded.filter(t => (t.regStatus||'').includes('انسحاب') || (t.traineeStatus||'').includes('انسحاب')).length;
+    let terminated = processedData.excluded.filter(t => (t.regStatus||'').includes('مطوي') || (t.traineeStatus||'').includes('مطوي')).length;
+    let terminatedCount = processedData.excluded.filter(t => (t.regStatus||'').includes('مطوي') || (t.traineeStatus||'').includes('مطوي')).length;
+    let deprivedTrainees = processedData.active.filter(t => t.totalDeprivedCourses > 0).length;
+    let over20Trainees = new Set(processedData.percentages.filter(p => p.absPercentage >= 20).map(p => p.traineeId)).size;
+    let warning15Trainees = new Set(processedData.percentages.filter(p => p.absPercentage >= 15 && p.absPercentage < 20).map(p => p.traineeId)).size;
+    let fullWeekAbsent = processedData.active.filter(t => Object.values(t.weekStatuses || {}).includes('كامل')).length;    
+    // حساب متوسط الغياب
+    let allAbsPercentages = processedData.percentages.map(p => p.absPercentage);
+let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=>a+b,0) / allAbsPercentages.length) : 0;
+    // --- [هام] تعريف بيانات الرسم البياني الدائري ---
+    let statusCounts = { "نشط": totalActive };
+    processedData.excluded.forEach(t => {
+        let s = t.traineeStatus || "أخرى";
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
-    // حساب متوسط الغياب العام بشكل مستقر
-    const allPercs = processedData.percentages.map(p => p.absPercentage);
-    const avgAbsence = allPercs.length > 0 ? (allPercs.reduce((a, b) => a + b, 0) / allPercs.length) : 0;
-    const over20Count = new Set(processedData.percentages.filter(p => p.absPercentage >= 20).map(p => p.traineeId)).size;
+    // 2. تجميع بيانات الأسابيع
+    let weeklyFull = Array(totalWeeks).fill(0);
+    let weeklyPartial = Array(totalWeeks).fill(0);
+    processedData.active.forEach(t => {
+    const weeks = t.weekStatuses || {};
+    for (let w = 1; w <= totalWeeks; w++) {
+        if (weeks[w] === 'كامل') weeklyFull[w - 1]++;
+        else if (weeks[w] === 'جزئي') weeklyPartial[w - 1]++;
+    }
+});
 
-    // --- 2. بناء الهيكل (HTML) ---
-    const txt = { trainees: isFemale ? "المتدربات" : "المتدربون", instructor: isFemale ? "المدربة" : "المدرب" };
-    
-    dashboardContainer.innerHTML = `
+    // 3. نصوص التأنيث/التذكير
+    const txt = {
+        trainee: isFemale ? "المتدربة" : "المتدرب",
+        trainees: isFemale ? "المتدربات" : "المتدربون",
+        withdrawn: isFemale ? "المنسحبات" : "المنسحبين",
+        deprived: isFemale ? "المحرومات" : "المحرومون",
+        over20: isFemale ? "تجاوزن 20%" : "تجاوزوا 20%",
+        instructors: isFemale ? "المدربات" : "المدربون",
+        instructor: isFemale ? "المدربة" : "المدرب"
+        terminated: isFemale ? "المطوي قيدهن" : "المطوي قيدهم"
+    };
+
+    // 4. بناء الـ HTML (البطاقات)
+    let html = `
         <div class="dash-grid">
-            <div class="dash-card"><h4>إجمالي ${txt.trainees}</h4><div class="val">${processedData.active.length + processedData.excluded.length}</div></div>
-            <div class="dash-card" style="border-bottom: 3px solid var(--danger);"><h4>محروم/ـة</h4><div class="val" style="color:var(--danger)">${deprivedCount}</div></div>
-            <div class="dash-card" style="border-bottom: 3px solid #ea580c;"><h4>تجاوز 20%</h4><div class="val" style="color:#ea580c">${over20Count}</div></div>
-            <div class="dash-card"><h4>متوسط الغياب</h4><div class="val">${avgAbsence.toFixed(1)}%</div></div>
+            <div class="dash-card" onclick="drillDown('absence', '')" style="border-bottom: 3px solid var(--primary);">
+                <h4>إجمالي ${txt.trainees}</h4>
+                <div class="val">${totalActive + totalExcluded}</div>
+                <div class="sub-val">${totalActive} نشطة | ${totalExcluded} مستبعدة</div>
+            </div>
+            <div class="dash-card">
+                <h4>التخصصات والشعب</h4>
+                <div class="val">${majorsCount}</div>
+                <div class="sub-val">${coursesCount} مقرر | ${crnsCount} شعبة</div>
+            </div>
+            <div class="dash-card" style="border-bottom: 3px solid var(--danger);">
+                <h4>${txt.deprived}</h4>
+                <div class="val" style="color: var(--danger);">${deprivedTrainees}</div>
+                <div class="sub-val">رصد لهن درجة (ح)</div>
+            </div>
+            <div class="dash-card" style="border-bottom: 3px solid #ea580c;">
+                <h4>${txt.over20}</h4>
+                <div class="val" style="color: #ea580c;">${over20Trainees}</div>
+                <div class="sub-val">مؤهلات للحرمان</div>
+            </div>
+            <div class="dash-card" style="border-bottom: 3px solid var(--warning);">
+                <h4>إنذار (15%+)</h4>
+                <div class="val" style="color: var(--warning);">${warning15Trainees}</div>
+                <div class="sub-val">بلغن نسبة الإنذار</div>
+            </div>
+            <div class="dash-card" onclick="switchTab('report-fullweek', document.getElementById('nav-fullweek'))" style="border-bottom: 3px solid #7c3aed;">
+                <h4>غياب أسبوع كامل</h4>
+                <div class="val">${fullWeekAbsent}</div>
+                <div class="sub-val">مرة واحدة على الأقل</div>
+            </div>
+            <div class="dash-card" onclick="drillDown('status', 'مطوي')" style="border-bottom: 3px solid #7c2d12;">
+    <h4>${txt.terminated}</h4>
+    <div class="val">${terminatedCount}</div>
+    <div class="sub-val">عمليات طي القيد</div>
+</div>
+            <div class="dash-card" onclick="drillDown('status', 'انسحاب')" style="border-bottom: 3px solid var(--text-muted);">
+                <h4>${txt.withdrawn}</h4>
+                <div class="val">${withdrawn}</div>
+                <div class="sub-val">انسحاب رسمي</div>
+            </div>
+            <div class="dash-card" style="border-bottom: 3px solid var(--info);">
+                <h4>متوسط غياب المقرر</h4>
+              <div class="val">${avgAbsence.toFixed(1)}%</div>
+                <div class="sub-val">بناءً على ${allAbsPercentages.length} سجل</div>
+            </div>
         </div>
 
         <div class="chart-row">
-            <div class="chart-container"><h4>حالات ${txt.trainees}</h4><canvas id="statusChart"></canvas></div>
-            <div class="chart-container"><h4>التوجه الأسبوعي</h4><canvas id="weeklyChart"></canvas></div>
+            <div class="chart-container">
+                <h4>توزيع حالات ${txt.trainees}</h4>
+                <canvas id="statusChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h4>توجه الغياب الأسبوعي (عدد ${txt.trainees})</h4>
+                <canvas id="weeklyChart"></canvas>
+            </div>
         </div>
 
-        <div class="admin-card">
-            <h4>تحليل التخصصات</h4>
-            <div class="_tableWrapper" style="max-height: 300px;">
+        <div class="admin-card" style="margin-bottom: 24px;">
+            <h4 style="color: var(--primary);">تحليل الأقسام والتخصصات (مؤشر الخطورة)</h4>
+            <div class="_tableWrapper" style="max-height: none;">
                 <table>
-                    <thead><tr><th>التخصص</th><th>العدد</th><th>المحرومين</th><th>المتوسط</th></tr></thead>
-                    <tbody id="majors-stats-body"></tbody>
+                    <thead>
+                        <tr>
+                            <th>التخصص</th>
+                            <th class="text-center">${txt.trainees}</th>
+                            <th class="text-center">${txt.deprived}</th>
+                            <th class="text-center">تجاوز 20%</th>
+                            <th class="text-center">متوسط الغياب</th>
+                            <th class="text-center">مؤشر الخطورة</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    // تحليل التخصصات
+    let majors = [...new Set(processedData.active.map(t => t.major))].sort();
+    majors.forEach(m => {
+        let mActive = processedData.active.filter(t => t.major === m);
+        let mDeprived = mActive.filter(t => t.totalDeprivedCourses > 0).length;
+        let mOver20 = new Set(processedData.percentages.filter(p => p.major === m && p.absPercentage >= 20).map(p => p.traineeId)).size;
+        let mPercs = processedData.percentages.filter(p => p.major === m).map(p => p.absPercentage);
+let mAvg = mPercs.length > 0 ? (mPercs.reduce((a,b)=>a+b,0) / mPercs.length) : 0;        
+        let riskScore = ((mDeprived/mActive.length)*40) + ((mOver20/mActive.length)*30) + (Math.min(mAvg, 30));
+        let riskClass = riskScore > 25 ? 'risk-high' : (riskScore > 15 ? 'risk-med' : '');
+
+        html += `
+            <tr class="${riskClass}">
+                <td style="cursor:pointer; color:var(--primary); font-weight:bold;" onclick="drillDown('major', '${m}')">${m}</td>
+                <td class="text-center mono">${mActive.length}</td>
+                <td class="text-center mono">${mDeprived}</td>
+                <td class="text-center mono">${mOver20}</td>
+                <td class="text-center mono">${mAvg.toFixed(1)}%</td>
+                <td class="text-center"><span class="badge ${riskScore > 25 ? 'badge-danger' : (riskScore > 15 ? 'badge-warning' : 'badge-success')}">${riskScore.toFixed(0)}</span></td>
+            </tr>
+        `;
+    });
+    html += `</tbody></table></div></div>`;
+
+    // تحليل المدربين والمقررات
+    let instNameMap = {};
+    rawData.ss01.forEach(row => {
+        let id = row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'];
+        let name = row['إسم المدرب'] || row['اسم المدرب'] || row['إسم المدربة'] || row['اسم المدربة'];
+        if (id && name) instNameMap[id.toString().trim()] = name.toString().trim();
+    });
+
+    let instructorAbs = {};
+    rawData.so04.forEach(row => {
+        let instId = row['رقم المدرب'] || row['الرقم الوظيفي'] || row['رقم المدربة'];
+        let hours = parseFloat(row['ساعات الغياب']) || 0;
+        if (instId && hours > 0) {
+            let idStr = instId.toString().trim();
+            instructorAbs[idStr] = (instructorAbs[idStr] || 0) + 1;
+        }
+    });
+    let sortedInst = Object.entries(instructorAbs).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+    let courseStats = {};
+    processedData.percentages.forEach(p => {
+        if(!courseStats[p.courseName]) courseStats[p.courseName] = { deprived: 0, over20: 0 };
+        if(p.isDeprived) courseStats[p.courseName].deprived++;
+        if(p.absPercentage >= 20) courseStats[p.courseName].over20++;
+    });
+    let sortedCourses = Object.entries(courseStats).sort((a,b) => b[1].over20 - a[1].over20).slice(0, 5);
+
+    html += `
+        <div class="admin-grid">
+            <div class="admin-card">
+                <h4>أكثر المقررات تجاوزاً للـ 20%</h4>
+                <table>
+                    <thead><tr><th>المقرر</th><th class="text-center">تجاوز 20%</th><th class="text-center">حرمان</th></tr></thead>
+                    <tbody>
+                        ${sortedCourses.map(([name, stat]) => `<tr><td>${name}</td><td class="text-center mono">${stat.over20}</td><td class="text-center mono">${stat.deprived}</td></tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div class="admin-card">
+                <h4>أعلى ${txt.instructors} تسجيلاً للغياب</h4>
+                <table>
+                    <thead><tr><th>${txt.instructor}</th><th class="text-center">عدد الحالات</th></tr></thead>
+                    <tbody>
+                        ${sortedInst.map(([id, val]) => `<tr><td>${instNameMap[id] || (txt.instructor + ' ' + id)}</td><td class="text-center mono">${val}</td></tr>`).join('')}
+                    </tbody>
                 </table>
             </div>
         </div>
     `;
 
-    // تعبئة جدول التخصصات
-    const majorsBody = document.getElementById('majors-stats-body');
-    const majors = [...new Set(processedData.active.map(t => t.major))].sort();
-    majors.forEach(m => {
-        const mActive = processedData.active.filter(t => t.major === m);
-        const mPercs = processedData.percentages.filter(p => p.major === m).map(p => p.absPercentage);
-        const mAvg = mPercs.length > 0 ? (mPercs.reduce((a,b)=>a+b,0)/mActive.length) : 0;
-        majorsBody.innerHTML += `<tr><td>${m}</td><td>${mActive.length}</td><td>${mActive.filter(t=>t.totalDeprivedCourses>0).length}</td><td>${mAvg.toFixed(1)}%</td></tr>`;
-    });
+    document.getElementById('dashboard-content').innerHTML = html;
 
-    // --- 3. إنشاء الرسوم البيانية (بعد تنظيف القديم) ---
-    if (statusChartInst) statusChartInst.destroy();
-    if (weeklyChartInst) weeklyChartInst.destroy();
-
+    // 5. رسم المخططات البيانية
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const textColor = isDark ? '#9fb0b5' : '#475569';
-    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
 
-    statusChartInst = new Chart(document.getElementById('statusChart'), {
+    new Chart(document.getElementById('statusChart'), {
         type: 'doughnut',
         data: {
             labels: Object.keys(statusCounts),
-            datasets: [{ data: Object.values(statusCounts), backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#3b82f6'], borderWidth: 0 }]
+            datasets: [{
+                data: Object.values(statusCounts),
+                backgroundColor: ['#34c2b4', '#ef4444', '#f59e0b', '#3b82f6', '#64748b'],
+                borderWidth: 0
+            }]
         },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Cairo' } } } } }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Cairo' } } } }
+        }
     });
 
-    weeklyChartInst = new Chart(document.getElementById('weeklyChart'), {
+    new Chart(document.getElementById('weeklyChart'), {
         type: 'line',
         data: {
             labels: Array.from({length: totalWeeks}, (_, i) => `أسبوع ${i+1}`),
             datasets: [
-                { label: 'غياب كامل', data: weeklyFull, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.4 },
-                { label: 'غياب جزئي', data: weeklyPartial, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.4 }
+                { label: 'غياب كامل', data: weeklyFull, borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', fill: true, tension: 0.3 },
+                { label: 'غياب جزئي', data: weeklyPartial, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.3 }
             ]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                x: { grid: { display: false }, ticks: { color: textColor } },
-                y: { grid: { color: gridColor }, ticks: { color: textColor }, beginAtZero: true }
+                x: { ticks: { color: textColor, font: { family: 'Cairo' } }, grid: { display: false } },
+                y: { beginAtZero: true, ticks: { color: textColor } }
             },
             plugins: { legend: { labels: { color: textColor, font: { family: 'Cairo' } } } }
         }
     });
 };
-
     const createThead = (isExcluded = false) => {
         let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب';
         let colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب';
