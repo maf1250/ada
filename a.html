@@ -298,7 +298,7 @@
             <span>الحرمان ماعدا مقرر</span><span class="tab-badge" id="badge-deprived-except">0</span>
         </div>
         <div class="_navItem" id="nav-excluded" onclick="switchTab('report-excluded', this)">
-            <span id="label-excluded">المنسحبين والمطوي قيدهم</span><span class="tab-badge" id="badge-excluded">0</span>
+            <span id="label-excluded">المنسحبون والمطوي قيدهم</span><span class="tab-badge" id="badge-excluded">0</span>
         </div>
         
         <div class="visitor-counter">
@@ -804,7 +804,7 @@ themeBtn.addEventListener('click', () => {
 
     window.updateUIText = function() {
         document.getElementById('label-main').innerText = isFemale ? 'المتدربات' : 'المتدربون';
-        document.getElementById('label-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبين والمطوي قيدهم';
+        document.getElementById('label-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبون والمطوي قيدهم';
         
         document.getElementById('legend-full').innerHTML = isFemale 
             ? 'تعني أن المتدربة انقطعت وغابت غياباً تاماً وبنسبة 100% عن جميع مقرراتها المسجلة في ذلك الأسبوع.'
@@ -1232,7 +1232,7 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
     const txt = {
         trainee: isFemale ? "المتدربة" : "المتدرب",
         trainees: isFemale ? "المتدربات" : "المتدربين",
-        withdrawn: isFemale ? "المنسحبات" : "المنسحبين",
+        withdrawn: isFemale ? "المنسحبات" : "المنسحبون",
         deprived: isFemale ? "المحرومات" : "المحرومون",
         over20: isFemale ? "تجاوزن 20%" : "تجاوزوا 20%",
         instructors: isFemale ? "المدربات" : "المدربين",
