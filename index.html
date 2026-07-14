@@ -1474,59 +1474,35 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
         });
     });
 
+// ---  حساب غياب الأسابيع والأيام (مباشرة من تقرير SO04) ---
     let weekAbsStats = {};
     let dayAbsStats = {};
-    const arabicDays = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
     rawData.so04.forEach(row => {
         let week = parseInt(row['رقم الأسبوع']);
-        let dateStr = row['تاريخ المحاضرة'];
         let absHours = parseFloat(row['ساعات الغياب']) || 0;
         let excuse = row['نوع العذر'] || '';
+        let dayStr = row['اليوم'] || '';
 
         if (!isNaN(week) && absHours > 0 && excuse.includes('بدون عذر')) {
-            weekAbsStats[week] = (weekAbsStats[week] || 0) + absHours; // تجميع بالأسبوع
+            // تجميع الساعات بناءً على الأسبوع
+            weekAbsStats[week] = (weekAbsStats[week] || 0) + absHours; 
 
-            if (dateStr) {
-                let dayIndex = -1;
-           // تنظيف التاريخ والتعامل مع صيغ الإكسل المتعددة
-                let cleanDate = dateStr.trim().split(' ')[0];
-                
-                // إذا كان التاريخ محفوظاً كرقم تسلسلي من الإكسل (مثال: 45150)
-                if (!isNaN(cleanDate) && !cleanDate.includes('/') && !cleanDate.includes('-')) {
-                    let excelSerial = parseInt(cleanDate);
-                    let dateObj = new Date(Math.round((excelSerial - 25569) * 86400 * 1000));
-                    dayIndex = dateObj.getDay();
-                } else {
-                    let p = cleanDate.split(/[-/]/);
-                    if (p.length === 3) {
-                        let y = p[0].length === 4 ? parseInt(p[0]) : parseInt(p[2]);
-                        if (y < 100) y += 2000; // تصحيح سنوات الخانتين (مثل 23 إلى 2023)
-                        
-                        let m, d;
-                        if (p[0].length === 4) { // حالة yyyy-mm-dd
-                            m = parseInt(p[1]) - 1; d = parseInt(p[2]);
-                        } else { 
-                            // الافتراضي dd/mm/yyyy
-                            d = parseInt(p[0]); m = parseInt(p[1]) - 1;
-                            // إذا ظهر أن الشهر أكبر من 12، نعكس لأن الصيغة تكون mm/dd/yyyy
-                            if (m + 1 > 12) {
-                                m = parseInt(p[0]) - 1; d = parseInt(p[1]);
-                            }
-                        }
-                        let dateObj = new Date(y, m, d);
-                        dayIndex = dateObj.getDay();
-                    }
-                }
-                
-                if (dayIndex >= 0 && dayIndex <= 6) {
-                    let dayName = arabicDays[dayIndex];
-                    dayAbsStats[dayName] = (dayAbsStats[dayName] || 0) + absHours; // تجميع باليوم
-                }
+            // تجميع الساعات بناءً على اليوم
+            if (dayStr) {
+                // تنظيف اسم اليوم من المسافات وتوحيد التسميات (الاثنين -> الإثنين)
+                let cleanDay = dayStr.trim().replace(/[أإآ]/g, 'ا');
+                if (cleanDay === "الاحد") cleanDay = "الأحد";
+                else if (cleanDay === "الاثنين") cleanDay = "الإثنين";
+                else if (cleanDay === "الاربعاء") cleanDay = "الأربعاء";
+                else cleanDay = dayStr.trim(); // لبقية الأيام مثل الثلاثاء والخميس
+
+                dayAbsStats[cleanDay] = (dayAbsStats[cleanDay] || 0) + absHours;
             }
         }
     });
 
+    // ---  ترتيب البيانات لاستخراج التوب  ---
     let topCoursesByDepPct = Object.entries(courseDetailedStats)
         .filter(c => c[1].enrolled >= 3)
         .map(c => ({ name: c[0], pct: (c[1].deprived / c[1].enrolled) * 100 }))
