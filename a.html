@@ -500,6 +500,7 @@ themeBtn.addEventListener('click', () => {
     var rawData = { sf01: [], ss01: [], so04: [] };
     var fileDates = { sf01: null, ss01: null, so04: null };
     var processedData = { active: [], excluded: [], percentages: [] };
+    var TTH = {};
     var courseHours = {}; 
     var isFemale = false; 
 
@@ -919,7 +920,7 @@ themeBtn.addEventListener('click', () => {
             };
         });
 
-        let TTH = {}; 
+         TTH = {}; 
         for(let c in globalSessionStatus) {
             for(let w in globalSessionStatus[c]) {
                 if(!TTH[w]) TTH[w] = {};
@@ -1209,18 +1210,23 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
         statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
-    // 2. تجميع بيانات الأسابيع
+// 2. تجميع بيانات الأسابيع (تصحيح الأسماء)
     let weeklyFull = Array(totalWeeks).fill(0);
     let weeklyPartial = Array(totalWeeks).fill(0);
     let weeklyProbable = Array(totalWeeks).fill(0);
+
     processedData.active.forEach(t => {
-    const weeks = t.weekStatuses || {};
+        const weeks = t.weekStatuses || {}; // نستخدم الاسم weeks هنا
         for (let w = 1; w <= totalWeeks; w++) {
-        if (weeks[w] === 'كامل') weeklyFull[w - 1]++;
-        else if (weeks[w] === 'جزئي') weeklyPartial[w - 1]++;
-        else if(weeks[w] === 'محتمل') weeklyProbable[w-1]++; 
-    }
-});
+            if (weeks[w] === 'كامل') {
+                weeklyFull[w - 1]++;
+            } else if (weeks[w] === 'جزئي') {
+                weeklyPartial[w - 1]++;
+            } else if (weeks[w] === 'محتمل') {
+                weeklyProbable[w - 1]++;
+            }
+        }
+    });
 
     // 3. نصوص التأنيث/التذكير
     const txt = {
