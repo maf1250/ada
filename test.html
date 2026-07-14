@@ -286,7 +286,7 @@
             <span>لوحة الإحصائيات</span>
         </div>
         <div class="_navItem" id="nav-instructors" onclick="switchTab('report-instructors', this)">
-            <span>تقرير المدربين</span><span class="tab-badge" id="badge-instructors">0</span>
+            <span id="label-instructors">تقرير المدربين</span><span class="tab-badge" id="badge-instructors">0</span>
         </div>
         <div class="_navItem" id="nav-sections" onclick="switchTab('report-sections', this)">
             <span>تقرير الشُعب والمقررات</span><span class="tab-badge" id="badge-sections">0</span>
@@ -788,6 +788,7 @@
 
     window.updateUIText = function() {
         document.getElementById('label-main').innerText = isFemale ? 'المتدربات' : 'المتدربون';
+        document.getElementById('label-instructors').innerText = isFemale ? 'تقرير المدربات' : 'تقرير المدربون';  
         document.getElementById('label-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبون والمطوي قيدهم';
         document.getElementById('label-threatened').innerText = isFemale ? 'المتدربات المهددات بالحرمان' : 'المتدربون المهددون بالحرمان';
         document.getElementById('legend-full').innerHTML = isFemale ? 'تعني أن المتدربة انقطعت وغابت غياباً تاماً وبنسبة 100% عن جميع مقرراتها المسجلة في ذلك الأسبوع.' : 'تعني أن المتدرب انقطع وغاب غياباً تاماً وبنسبة 100% عن جميع مقرراته المسجلة في ذلك الأسبوع.';
