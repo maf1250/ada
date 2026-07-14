@@ -1074,9 +1074,10 @@
             }
         });
         
-        Object.values(instMap).forEach(i => {
+       Object.values(instMap).forEach(i => {
             i.avgPct = i.crnCount > 0 ? i.totalAbsPctSum / i.crnCount : 0;
             i.lastActionDate = instructorLastAction[i.id] ? instructorLastAction[i.id].display : 'غير متوفر';
+            i.canceledCount = instructorCanceledCount[i.name] || 0; 
             processedData.instructors.push(i);
         });
 
@@ -1309,11 +1310,11 @@
     };
 
     window.renderTables = function(totalWeeks) {
-        let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب'; let colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب'; let colInst = isFemale ? 'المدربة' : 'المدرب';
+        let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب'; let colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب'; let colInst = isFemale ? 'المدربة' : 'المدرب'; let colTotal = isFemale ? 'المتدربات المسجلات' : 'المتدربون المسجلون';
 
         // جداول المدربين والشعب الجديدة
-        let htmlInst = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">الرقم الوظيفي</th><th class="nowrap sortable name-cell" onclick="sortTable(this, 1, false)">اسم ${colInst}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 2, true)">إجمالي الشُعب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 3, true)">المتدربين المسجلين</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, true)">حالات الحرمان</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">متوسط الغياب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, false)">تاريخ آخر تحضير رُصد</th></tr>${createFilterRow(7)}</thead><tbody>`;
-        processedData.instructors.forEach(i => { htmlInst += `<tr><td class="mono">${i.id}</td><td class="name-cell">${i.name}</td><td class="text-center mono">${i.crnCount}</td><td class="text-center mono">${i.totalEnrolled}</td><td class="text-center mono"><span class="badge ${i.totalDeprived > 0 ? 'badge-danger' : 'badge-success'}">${i.totalDeprived}</span></td><td class="text-center mono" style="color:var(--warning); font-weight:bold;">${i.avgPct.toFixed(1)}%</td><td class="text-center mono">${i.lastActionDate}</td></tr>`; });
+        let htmlInst = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">الرقم الوظيفي</th><th class="nowrap sortable name-cell" onclick="sortTable(this, 1, false)">اسم ${colInst}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 2, true)">إجمالي الشُعب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 3, true)">${colInst}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, true)">حالات الحرمان</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">متوسط الغياب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, true)">محاضرات ملغاة</th><th class="nowrap text-center sortable" onclick="sortTable(this, 7, false)">تاريخ آخر تحضير رُصد</th></tr>${createFilterRow(8)}</thead><tbody>`;
+        processedData.instructors.forEach(i => { htmlInst += `<tr><td class="mono">${i.id}</td><td class="name-cell">${i.name}</td><td class="text-center mono">${i.crnCount}</td><td class="text-center mono">${i.totalEnrolled}</td><td class="text-center mono"><span class="badge ${i.totalDeprived > 0 ? 'badge-danger' : 'badge-success'}">${i.totalDeprived}</span></td><td class="text-center mono" style="color:var(--warning); font-weight:bold;">${i.avgPct.toFixed(1)}%</td><td class="text-center mono" style="color:var(--info); font-weight:bold;">${i.canceledCount}</td><td class="text-center mono">${i.lastActionDate}</td></tr>`; });
         htmlInst += `</tbody></table>`; document.getElementById('table-instructors').innerHTML = htmlInst;
 
         let htmlSec = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">الشعبة (CRN)</th><th class="nowrap sortable" onclick="sortTable(this, 1, false)">رمز المقرر</th><th class="nowrap sortable name-cell" onclick="sortTable(this, 2, false)">اسم المقرر</th><th class="nowrap sortable" onclick="sortTable(this, 3, false)">اسم ${colInst}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, true)">المسجلين</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">المحرومين</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, true)">متوسط غياب الشعبة</th></tr>${createFilterRow(7)}</thead><tbody>`;
