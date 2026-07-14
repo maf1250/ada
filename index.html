@@ -1518,6 +1518,11 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
         .map(i => ({ name: i[0], pct: (i[1].deprived / i[1].enrolled) * 100 }))
         .sort((a, b) => b.pct - a.pct).slice(0, 5);
 
+       let leastInstructorsByDepPct = Object.entries(instructorDetailedStats)
+        .filter(i => i[1].enrolled >= 3)
+        .map(i => ({ name: i[0], pct: (i[1].deprived / i[1].enrolled) * 100 }))
+        .sort((a, b) => a.pct - b.pct).slice(0, 5);
+    
     let topWeeks = Object.entries(weekAbsStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
     let topDays = Object.entries(dayAbsStats).sort((a, b) => b[1] - a[1]).slice(0, 5);
     
@@ -1534,6 +1539,8 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
         <div class="admin-card"><h4>أكثر الأسابيع غياباً</h4><table><thead><tr><th>الأسبوع</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topWeeks.map(w => `<tr><td>الأسبوع ${w[0]}</td><td class="text-center mono">${w[1].toFixed(0)}</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>أكثر الأيام تسجيلاً للغياب</h4><table><thead><tr><th>اليوم</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topDays.map(d => `<tr><td>${d[0]}</td><td class="text-center mono">${d[1].toFixed(0)}</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>أعلى ${txt.instructors} نسبةً للحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">النسبة (%)</th></tr></thead><tbody>${topInstructorsByDepPct.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:var(--danger);">${i.pct.toFixed(1)}%</td></tr>`).join('')}</tbody></table></div>
+        <div class="admin-card"><h4>أقل ${txt.instructors} نسبةً للحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">النسبة (%)</th></tr></thead><tbody>${leastInstructorsByDepPct.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:var(--danger);">${i.pct.toFixed(1)}%</td></tr>`).join('')}</tbody></table></div>
+
     </div>`;
 
     // --- المحلل الذكي آلياً ---
