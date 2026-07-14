@@ -962,7 +962,7 @@ themeBtn.addEventListener('click', () => {
         });
 
         const majorSelect = document.getElementById('filterMajor');
-        majorSelect.innerHTML = '<option value="">كل التخصصات / الأقسام</option>';
+        majorSelect.innerHTML = '<option value="">كل التخصصات</option>';
         [...majorsSet].sort().forEach(m => majorSelect.innerHTML += `<option value="${m}">${m}</option>`);
 
         const statusSelect = document.getElementById('filterStatus');
