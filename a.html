@@ -189,8 +189,14 @@
         .dash-card .sub-val { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
 
         .chart-row { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 24px; }
-        .chart-container { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; min-height: 300px; }
-        .chart-container h4 { margin: 0 0 16px 0; font-size: 14px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+.chart-container {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    height: 400px; 
+    position: relative;
+}        .chart-container h4 { margin: 0 0 16px 0; font-size: 14px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
 
         .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 24px; }
         .admin-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; }
@@ -1286,17 +1292,41 @@ themeBtn.addEventListener('click', () => {
 
         let sortedCourses = Object.entries(courseStats).sort((a,b) => b[1].over20 - a[1].over20).slice(0, 5);
 
-        // تجميع المدربين من SS01 و SO04
-        let instructorAbs = {};
-        rawData.so04.forEach(row => {
-            let inst = row['إسم المدرب'] || row['اسم المدرب'];
-            if(inst && inst !== "" && (row['نوع العذر']||'').includes('بدون عذر')) {
-                instructorAbs[inst] = (instructorAbs[inst] || 0) + 1;
+// 1. بناء قاموس لربط رقم المدرب بالاسم من ملف SS01
+        let instNameMap = {};
+        rawData.ss01.forEach(row => {
+            let id = row['رقم المدرب'] || row['الرقم الوظيفي'];
+            let name = row['إسم المدرب'] || row['اسم المدرب'];
+            if (id && name) {
+                instNameMap[id.toString().trim()] = name.toString().trim();
             }
         });
-        let sortedInst = Object.entries(instructorAbs).sort((a,b) => b[1] - a[1]).slice(0, 5);
 
-        html += `
+        // 2. تجميع الغياب من SO04 باستخدام رقم المدرب
+        let instructorAbs = {};
+        rawData.so04.forEach(row => {
+            let instId = row['رقم المدرب'] || row['الرقم الوظيفي'];
+            let excuse = row['نوع العذر'] || '';
+            let hours = parseFloat(row['ساعات الغياب']) || 0;
+
+            if (instId && hours > 0 && (excuse.includes('بدون عذر') || excuse.trim() === "")) {
+                let idStr = instId.toString().trim();
+                instructorAbs[idStr] = (instructorAbs[idStr] || 0) + 1;
+            }
+        });
+
+        // 3. ترتيب المدربين وتجهيز البيانات للعرض
+        let sortedInst = Object.entries(instructorAbs)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+
+        // 4. بناء جدول المدربين مع جلب الاسم من القاموس
+        let instructorRows = sortedInst.map(([id, val]) => {
+            let name = instNameMap[id] || `مدرب رقم: ${id}`; // إذا لم يجد الاسم يضع الرقم
+            return `<tr><td>${name}</td><td class="text-center mono">${val}</td></tr>`;
+        }).join('');
+        
+                html += `
             <div class="admin-grid">
                 <div class="admin-card">
                     <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> أكثر المقررات تجاوزاً للـ 20%</h4>
@@ -1312,8 +1342,8 @@ themeBtn.addEventListener('click', () => {
                     <table>
                         <thead><tr><th>المدرب</th><th class="text-center">حالات الغياب</th></tr></thead>
                         <tbody>
-                            ${sortedInst.map(([name, val]) => `<tr><td>${name}</td><td class="text-center mono">${val}</td></tr>`).join('')}
-                        </tbody>
+ ${instructorRows}
+ </tbody>
                     </table>
                 </div>
             </div>
