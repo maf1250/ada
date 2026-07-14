@@ -193,10 +193,13 @@
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 16px;
-    height: 400px; 
+    padding: 20px;
+    height: 500px; /* زدنا الارتفاع من 400 إلى 500 */
     position: relative;
-}        .chart-container h4 { margin: 0 0 16px 0; font-size: 14px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+    display: flex;
+    flex-direction: column;
+}
+            .chart-container h4 { margin: 0 0 16px 0; font-size: 14px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
 
         .admin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-top: 24px; }
         .admin-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; }
@@ -1381,10 +1384,23 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
             }]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { color: textColor, font: { family: 'Cairo' } } } }
-        }
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+            padding: { bottom: 20 } // إضافة مساحة في الأسفل
+        },
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: textColor,
+                    padding: 20, // مسافة بين عناصر الليجند
+                    font: { family: 'Cairo', size: 11 },
+                    usePointStyle: true // جعل العلامات دوائر بدلاً من مربعات لتقليل الزحام
+                }
+                }
+            }
+            }
     });
 
     new Chart(document.getElementById('weeklyChart'), {
@@ -1396,15 +1412,32 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
                 { label: 'غياب جزئي', data: weeklyPartial, borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.1)', fill: true, tension: 0.3 }
             ]
         },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: { ticks: { color: textColor, font: { family: 'Cairo' } }, grid: { display: false } },
-                y: { beginAtZero: true, ticks: { color: textColor } }
+       options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+        x: {
+            ticks: {
+                color: textColor,
+                font: { family: 'Cairo', size: 10 },
+                maxRotation: 45, // تدوير النصوص لتجنب التداخل
+                minRotation: 45,
+                autoSkip: true,   // تخطي بعض التسميات تلقائياً إذا كانت المساحة ضيقة جداً
+                maxTicksLimit: 18 // السماح بظهور جميع الأسابيع إذا أمكن
             },
-            plugins: { legend: { labels: { color: textColor, font: { family: 'Cairo' } } } }
+            grid: { display: false }
+        },
+        y: {
+            beginAtZero: true,
+            ticks: { color: textColor }
         }
+    },
+    plugins: {
+        legend: {
+            labels: { color: textColor, font: { family: 'Cairo' }, padding: 15 }
+        }
+    }
+}
     });
 };
     const createThead = (isExcluded = false) => {
