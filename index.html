@@ -1270,8 +1270,12 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
                 <div class="sub-val">${totalActive} ${txt.current} | ${totalExcluded} ${txt.leftOut}</div>
             </div>
             <div class="dash-card">
-                <h4>التخصصات والشعب</h4>
+                <h4>التخصصات</h4>
                 <div class="val">${majorsCount}</div>
+                <div class="sub-val">${coursesCount} مقرر | ${crnsCount} شعبة</div>
+            </div>
+                            <h4>الشعب والمقررات</h4>
+                <div class="val">${coursesCount}</div>
                 <div class="sub-val">${coursesCount} مقرر | ${crnsCount} شعبة</div>
             </div>
             <div class="dash-card" style="border-bottom: 3px solid var(--danger);">
@@ -1415,6 +1419,7 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
 
     let sortedInst = Object.entries(instructorAbs).sort((a,b) => b[1] - a[1]).slice(0, 5);
     let sortedCourses = Object.entries(courseStats).sort((a,b) => b[1].over20 - a[1].over20).slice(0, 5);
+    let leastCourses = Object.entries(courseStats).sort((a, b) => a[1].over20 - b[1].over20).slice(0, 5);
 // حساب إحصائيات المدربين (الأكثر والأقل)
     let allInstructorIds = Object.keys(instNameMap);
     let instructorStats = Object.keys(instNameMap).map(id => ({ name: instNameMap[id], count: instructorAbs[id] || 0 }));
@@ -1434,6 +1439,7 @@ let avgAbsence = allAbsPercentages.length > 0 ? (allAbsPercentages.reduce((a,b)=
         <div class="admin-card"><h4>أكثر المقررات تجاوزاً للـ 20%</h4><table><thead><tr><th>المقرر</th><th class="text-center">تجاوز 20%</th></tr></thead><tbody>${sortedCourses.map(([n, s]) => `<tr><td>${n}</td><td class="text-center mono">${s.over20}</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>${txt.topAbsentTrainees}</h4><table><thead><tr><th>${txt.trainee}</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topAbsentTrainees.map(t => `<tr><td>${t.name}</td><td class="text-center mono">${t.totalAbs.toFixed(0)} ساعة</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>${txt.leastAbsentTrainees}</h4><table><thead><tr><th>${txt.trainee}</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${leastAbsentTrainees.map(t => `<tr><td>${t.name}</td><td class="text-center mono">${t.totalAbs.toFixed(0)} ساعة</td></tr>`).join('')}</tbody></table></div>
+        <div class="admin-card"><h4>أقل المقررات حرماناً</h4><table><thead><tr><th>المقرر</th><th class="text-center">حالات الحرمان</th></tr></thead><tbody>${leastCourses.map(([n, s]) => `<tr><td>${n}</td><td class="text-center mono">${s.over20}</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>أعلى ${txt.instructors} تسجيلاً للغياب</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">الحالات</th></tr></thead><tbody>${topInst.map(i => `<tr><td>${i.name}</td><td class="text-center mono">${i.count}</td></tr>`).join('')}</tbody></table></div>
         <div class="admin-card"><h4>${txt.leastAbsenceInstructors}</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">الحالات</th></tr></thead><tbody>${leastInst.map(i => `<tr><td>${i.name}</td><td class="text-center mono">${i.count}</td></tr>`).join('')}</tbody></table></div>
     </div>`;
