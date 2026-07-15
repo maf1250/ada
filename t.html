@@ -276,6 +276,17 @@
     <div class="_sidebar">
         <div style="padding: 0 var(--sp-4) var(--sp-4); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-2);">
             <h2 style="margin: 0; color: var(--primary); font-size: var(--fs-lg);">نظام متابعة غياب المتدربين</h2>
+            </div>
+        
+        <div style="padding: 10px 15px; border-bottom: 1px solid var(--border); background: var(--bg-surface);">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">الفصل التدريبي الفعال:</div>
+            <select id="termSelector" class="input-select" style="width: 100%; margin-bottom: 8px; font-weight: bold; color: var(--primary);" onchange="switchTerm()"></select>
+            <div style="display: flex; gap: 5px;">
+                <button class="btn-action" style="flex: 1; padding: 4px; font-size: 11px; justify-content: center;" onclick="createNewTerm()">+ إضافة فصل</button>
+                <button class="btn-action" style="flex: 1; padding: 4px; font-size: 11px; justify-content: center; color: var(--danger); border-color: var(--danger-subtle);" onclick="deleteCurrentTerm()">حذف الفصل</button>
+            </div>
+        </div>
+        
             <div class="credits">
                 <b>إعداد وتطوير:</b><br>
                 أ. منصور عبدالعزيز الفايز<br>
@@ -554,24 +565,108 @@
         } catch (e) { console.error("Error loading from IndexedDB:", e); return null; }
     }
 
+  var activeTermName = "الفصل الحالي";
+    var termsList = ["الفصل الحالي"];
     var rawData = { sf01: [], ss01: [], so04: [] };
     var fileDates = { sf01: null, ss01: null, so04: null };
     var processedData = { active: [], excluded: [], percentages: [], instructors: [], sections: [] };
-    var TTH = {};
-    var courseHours = {}; 
-    var isFemale = false; 
-    
-    // متغيرات جديدة للإحصائيات
+    var TTH = {}; var courseHours = {}; var isFemale = false; 
     var globalExcuseStats = { unexcused: 0, excused: 0, canceled: 0 };
-    var instructorCanceledCount = {};
-    var fullTraineeSessionDetails = {};
+    var instructorCanceledCount = {}; var fullTraineeSessionDetails = {};
 
     async function saveDataLocally() {
         try {
-            localStorage.setItem('abs_reports_dates', JSON.stringify(fileDates));
-            await saveToDB('rawData', rawData);
-        } catch (e) {}
+            // دمج البيانات مع التواريخ في حزمة واحدة لكل فصل
+            let termPackage = { data: rawData, dates: fileDates };
+            await saveToDB('term_' + activeTermName, termPackage);
+            localStorage.setItem('abs_terms_list', JSON.stringify(termsList));
+            localStorage.setItem('abs_active_term', activeTermName);
+        } catch (e) { console.error(e); }
     }
+
+    function renderTermDropdown() {
+        let sel = document.getElementById('termSelector');
+        sel.innerHTML = '';
+        termsList.forEach(t => {
+            sel.innerHTML += `<option value="${t}" ${t === activeTermName ? 'selected' : ''}>${t}</option>`;
+        });
+    }
+
+    window.createNewTerm = async function() {
+        let newName = prompt("نأمل إدخال اسم الفصل التدريبي الجديد (مثال: الفصل الثاني 1446):");
+        if(newName && newName.trim() !== "") {
+            newName = newName.trim();
+            if(termsList.includes(newName)) { alert("هذا الاسم موجود مسبقاً!"); return; }
+            
+            termsList.push(newName);
+            activeTermName = newName;
+            
+            // تصفير البيانات للفصل الجديد
+            rawData = { sf01: [], ss01: [], so04: [] };
+            fileDates = { sf01: null, ss01: null, so04: null };
+            
+            // تصفير واجهة الرفع
+            ['sf01', 'ss01', 'so04'].forEach(t => {
+                document.getElementById(`drop-${t}`).classList.remove('has-file');
+                let dateEl = document.getElementById(`date-${t}`); if(dateEl) dateEl.innerHTML = '';
+            });
+
+            await saveDataLocally();
+            renderTermDropdown();
+            processData(); // سيعيد تصفير الجداول وعرض أصفار
+            switchTab('upload', document.getElementById('nav-upload'));
+        }
+    };
+
+    window.switchTerm = async function() {
+        let selectedTerm = document.getElementById('termSelector').value;
+        activeTermName = selectedTerm;
+        localStorage.setItem('abs_active_term', activeTermName);
+        
+        let dbData = await loadFromDB('term_' + activeTermName);
+        if(dbData) {
+            rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
+            fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+        } else {
+            rawData = { sf01: [], ss01: [], so04: [] };
+            fileDates = { sf01: null, ss01: null, so04: null };
+        }
+
+        // تحديث واجهة الرفع
+        ['sf01', 'ss01', 'so04'].forEach(type => {
+            let dropz = document.getElementById(`drop-${type}`);
+            if(rawData[type] && rawData[type].length > 0) {
+                dropz.classList.add('has-file');
+                dropz.querySelector('p').innerText = "تم استرجاع الملف من الأرشيف";
+                if(fileDates[type]) renderFileDate(type, new Date(fileDates[type]));
+            } else {
+                dropz.classList.remove('has-file');
+                dropz.querySelector('p').innerText = type === 'sf01' ? "قائمة المتدربين" : (type === 'ss01' ? "جداول الوحدة" : "تقرير الغياب");
+                let dateEl = document.getElementById(`date-${type}`); if(dateEl) dateEl.innerHTML = '';
+            }
+        });
+
+        processData();
+        switchTab('report-dashboard', document.getElementById('nav-dashboard'));
+    };
+
+    window.deleteCurrentTerm = async function() {
+        if(termsList.length <= 1) { alert("لا يمكن حذف الفصل الوحيد المتبقي!"); return; }
+        if(confirm(`هل أنت متأكد من حذف بيانات "${activeTermName}" نهائياً؟`)) {
+            // مسح من IndexedDB (تجاوز حفظه)
+            try {
+                let db = await openDB();
+                let transaction = db.transaction(['store'], 'readwrite');
+                transaction.objectStore('store').delete('term_' + activeTermName);
+            } catch(e){}
+            
+            termsList = termsList.filter(t => t !== activeTermName);
+            activeTermName = termsList[0]; // العودة لأول فصل
+            await switchTerm();
+            renderTermDropdown();
+            await saveDataLocally(); // حفظ القائمة الجديدة
+        }
+    };
 
     function saveSettingsLocally() {
         let settings = {
@@ -1354,7 +1449,6 @@
     window.renderTables = function(totalWeeks) {
         let colId = isFemale ? 'رقم المتدربة' : 'رقم المتدرب'; let colName = isFemale ? 'اسم المتدربة' : 'اسم المتدرب'; let colInst = isFemale ? 'المدربة' : 'المدرب'; let colTotal = isFemale ? 'عدد المسجلات' : 'عدد المسجلون'; let colDeprived = isFemale ? 'المحرومات' : 'المحرومين';
 
-        // جداول المدربين والشعب الجديدة
         let htmlInst = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">الرقم الوظيفي</th><th class="nowrap sortable" onclick="sortTable(this, 1, false)">اسم ${colInst}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 2, true)">إجمالي الشُعب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 3, true)">${colTotal}</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, true)">حالات الحرمان</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">متوسط الغياب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, true)">محاضرات ملغاة</th><th class="nowrap text-center sortable" onclick="sortTable(this, 7, false)">تاريخ آخر تحضير رُصد</th></tr>${createFilterRow(8)}</thead><tbody>`;
         processedData.instructors.forEach(i => { htmlInst += `<tr><td class="mono">${i.id}</td><td class="name-cell">${i.name}</td><td class="text-center mono">${i.crnCount}</td><td class="text-center mono">${i.totalEnrolled}</td><td class="text-center mono"><span class="badge ${i.totalDeprived > 0 ? 'badge-danger' : 'badge-success'}">${i.totalDeprived}</span></td><td class="text-center mono" style="color:var(--warning); font-weight:bold;">${i.avgPct.toFixed(1)}%</td><td class="text-center mono" style="color:var(--info); font-weight:bold;">${i.canceledCount}</td><td class="text-center mono">${i.lastActionDate}</td></tr>`; });
         htmlInst += `</tbody></table>`; document.getElementById('table-instructors').innerHTML = htmlInst;
@@ -1420,8 +1514,8 @@ Object.values(t.crns).forEach(c => {
         let htmlExc = `<table>${createThead(true)}<tbody>`; processedData.excluded.forEach(t => htmlExc += createRow(t, true)); htmlExc += `</tbody></table>`; document.getElementById('table-excluded').innerHTML = htmlExc;
 
         let customActionCol = { 7: `<button class="btn-action" style="padding:4px 8px; font-size:10.5px; width:100%; justify-content:center; background:var(--bg-elevated);" onclick="openWaModal()">تعديل العبارة ⚙️</button>` };
-let bulkActionBtn = `<div style="margin-bottom: 15px; display: flex; gap: 10px;"><button class="btn-action" style="background: var(--success-subtle); color: var(--success); border-color: var(--success);" onclick="sendBulkWhatsApp(this)">إرسال واتساب للمحددين (جماعي) 💬</button></div>`;
-        let headPerc = bulkActionBtn + `<table><thead><tr><th style="width: 30px; text-align: center;"><input type="checkbox" onclick="toggleAllCheckboxes(this)"></th><th class="nowrap sortable" onclick="sortTable(this, 1, false)">${colId}</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 2, false)">${colName}</th><th class="nowrap sortable" onclick="sortTable(this, 3, false)">رمز المقرر</th><th class="sortable" onclick="sortTable(this, 4, false)">اسم المقرر</th><th class="nowrap sortable" onclick="sortTable(this, 5, false)">الشعبة</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, true)">نسبة الغياب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 7, false)">الحالة</th><th class="nowrap text-center">الإجراء</th></tr>${createFilterRow(9, [0, 8], {8: customActionCol[7]})}</thead><tbody>`;        
+        let headPerc = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th><th class="nowrap sortable" onclick="sortTable(this, 2, false)">رمز المقرر</th><th class="sortable" onclick="sortTable(this, 3, false)">اسم المقرر</th><th class="nowrap sortable" onclick="sortTable(this, 4, false)">الشعبة</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">نسبة الغياب</th><th class="nowrap text-center sortable" onclick="sortTable(this, 6, false)">الحالة</th><th class="nowrap text-center">الإجراء</th></tr>${createFilterRow(8, [7], customActionCol)}</thead><tbody>`;
+        
         let currentWaTemplate = localStorage.getItem(isFemale ? 'wa_template_f' : 'wa_template_m') || (isFemale ? "عزيزتي {name}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابكِ في مقرر \n{course}\n هي {pct}% \nلذا نأمل منكِ الانتباه والحرص على عدم الغياب" : "عزيزي {name}\nهذه رسالة تلقائية تبلغك بأن نسبة غيابك في مقرر \n{course}\n هي {pct}% \nلذا نأمل منك الانتباه والحرص على عدم الغياب");
 
         let htmlPerc = headPerc; let htmlThreatened = headPerc;
@@ -1430,7 +1524,7 @@ let bulkActionBtn = `<div style="margin-bottom: 15px; display: flex; gap: 10px;"
             let msg = currentWaTemplate.replace(/{name}/g, p.traineeName).replace(/{course}/g, p.courseName).replace(/{pct}/g, p.absPercentage.toFixed(1));
             let waUrl = `https://api.whatsapp.com/send?phone=${window.formatPhone(p.phone)}&text=${encodeURIComponent(msg)}`;
             let statusBadge = p.isLifted ? '<span class="badge" style="background:rgba(234, 88, 12, 0.15); color:#ea580c; border:1px solid #ea580c;">رفع حرمان</span>' : (p.isDeprived ? `<span class="badge badge-danger">${isFemale?'محرومة (ح)':'محروم (ح)'}</span>` : (p.absPercentage > 20 ? '<span class="badge badge-danger" style="background:#ea580c26; color:#ea580c; border-color:#ea580c;">تجاوز 20%</span>' : (p.absPercentage >= 15 ? '<span class="badge badge-warning">إنذار</span>' : '<span class="badge badge-success">طبيعي</span>')));
-            let rowHtml = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="true"><td class="text-center"><input type="checkbox" class="wa-checkbox" data-url="${waUrl}"></td><td class="mono">${p.traineeId}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${p.traineeId}'); return false;">${p.traineeName}</a></td><td class="mono">${p.courseCode}</td><td>${p.courseName}</td><td class="mono">${p.crn}</td><td class="mono text-center" style="color: ${p.absPercentage >= 15 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: bold;">${p.absPercentage.toFixed(1)}%</td><td class="text-center">${statusBadge}</td><td class="text-center nowrap"><a href="${waUrl}" target="_blank" class="btn-whatsapp">إرسال واتساب</a></td></tr>`;
+            let rowHtml = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="true"><td class="mono">${p.traineeId}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${p.traineeId}'); return false;">${p.traineeName}</a></td><td class="mono">${p.courseCode}</td><td>${p.courseName}</td><td class="mono">${p.crn}</td><td class="mono text-center" style="color: ${p.absPercentage >= 15 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: bold;">${p.absPercentage.toFixed(1)}%</td><td class="text-center">${statusBadge}</td><td class="text-center nowrap"><a href="${waUrl}" target="_blank" class="btn-whatsapp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> إرسال واتساب</a></td></tr>`;
             htmlPerc += rowHtml;
             if (p.absPercentage >= 18 && p.absPercentage <= 20) {
                 let tb = '<span class="badge badge-warning" style="background:#facc1533; color:#ca8a04; border-color:#facc15;">على وشك الحرمان</span>';
@@ -1454,49 +1548,47 @@ let bulkActionBtn = `<div style="margin-bottom: 15px; display: flex; gap: 10px;"
     window.saveWaTemplate = function() { localStorage.setItem(isFemale ? 'wa_template_f' : 'wa_template_m', document.getElementById('waTemplateInput').value); closeWaModal(); window.renderTables(parseInt(document.getElementById('totalWeeks').value) || 18); };
     window.insertWaVar = function(v) { let input = document.getElementById('waTemplateInput'); let start = input.selectionStart; let end = input.selectionEnd; input.value = input.value.substring(0, start) + v + input.value.substring(end); input.focus(); input.selectionStart = input.selectionEnd = start + v.length; };
 
-    window.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener('DOMContentLoaded', async () => {
         let settings = JSON.parse(localStorage.getItem('abs_reports_settings'));
         if (settings) { document.getElementById('totalWeeks').value = settings.weeks || 18; window.savedFilters = settings; }
-        let storedDates = localStorage.getItem('abs_reports_dates'); let dbData = await loadFromDB('rawData');
+        
+        let storedTerms = localStorage.getItem('abs_terms_list');
+        if(storedTerms) termsList = JSON.parse(storedTerms);
+        let storedActive = localStorage.getItem('abs_active_term');
+        if(storedActive && termsList.includes(storedActive)) activeTermName = storedActive;
+        else activeTermName = termsList[0];
+        
+        renderTermDropdown();
+
+        let dbData = await loadFromDB('term_' + activeTermName);
+        
+        if(!dbData) {
+            let oldData = await loadFromDB('rawData');
+            if(oldData) {
+                dbData = { data: oldData, dates: JSON.parse(localStorage.getItem('abs_reports_dates') || '{}') };
+                await saveToDB('term_' + activeTermName, dbData); 
+         }
+        }
+
         if (dbData) {
             try {
-                rawData = dbData;
-                if (storedDates) { fileDates = JSON.parse(storedDates); Object.keys(fileDates).forEach(type => { if (fileDates[type]) { renderFileDate(type, new Date(fileDates[type])); let dropz = document.getElementById(`drop-${type}`); if(dropz) { dropz.classList.add('has-file'); dropz.querySelector('p').innerText = "تم استرجاع الملف من التخزين"; } } }); }
-                if (rawData.sf01?.length > 0 && rawData.ss01?.length > 0 && rawData.so04?.length > 0) { processData(); switchTab('report-dashboard', document.getElementById('nav-dashboard')); } else switchTab('upload', document.getElementById('nav-upload'));
+                rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
+                fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+                
+                Object.keys(fileDates).forEach(type => { 
+                    if (fileDates[type] && rawData[type] && rawData[type].length > 0) { 
+                        renderFileDate(type, new Date(fileDates[type])); 
+                        let dropz = document.getElementById(`drop-${type}`); 
+                        if(dropz) { dropz.classList.add('has-file'); dropz.querySelector('p').innerText = "تم استرجاع الملف من التخزين"; } 
+                    } 
+                });
+                
+                if (rawData.sf01?.length > 0 && rawData.ss01?.length > 0 && rawData.so04?.length > 0) { 
+                    processData(); switchTab('report-dashboard', document.getElementById('nav-dashboard')); 
+                } else switchTab('upload', document.getElementById('nav-upload'));
             } catch(e) { switchTab('upload', document.getElementById('nav-upload')); }
         } else switchTab('upload', document.getElementById('nav-upload'));
     });
-    window.toggleAllCheckboxes = function(mainCheckbox) {
-        let table = mainCheckbox.closest('table');
-        let checkboxes = table.querySelectorAll('.wa-checkbox');
-        checkboxes.forEach(cb => {
-            // تحديد المتدربين الظاهرين فقط (غير المخفيين بالفلتر)
-            if(cb.closest('tr').style.display !== 'none') {
-                cb.checked = mainCheckbox.checked;
-            }
-        });
-    };
-
-    window.sendBulkWhatsApp = function(btn) {
-        let wrapper = btn.closest('.tab-content');
-        let checkboxes = wrapper.querySelectorAll('.wa-checkbox:checked');
-        
-        if(checkboxes.length === 0) {
-            alert("الرجاء تحديد متدرب واحد على الأقل من الجدول.");
-            return;
-        }
-
-        if(confirm(`سيتم فتح (${checkboxes.length}) نافذة واتساب متتالية.\n\nتنبيه: يجب أن تسمح للمتصفح بفتح "النوافذ المنبثقة" (Pop-ups) ليعمل الإرسال الجماعي.\nهل تريد الاستمرار؟`)) {
-            let delay = 0;
-            checkboxes.forEach(cb => {
-                let url = cb.getAttribute('data-url');
-                setTimeout(() => {
-                    window.open(url, '_blank');
-                }, delay);
-                delay += 800; // تأخير أقل من ثانية بين كل نافذة لمنع تعليق المتصفح
-            });
-        }
-    };
 </script>
 </body>
 </html>
