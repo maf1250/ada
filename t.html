@@ -727,7 +727,6 @@ window.deleteCurrentTerm = async function() {
                     let clearRequest = store.clear(); // تفريغ كل السجلات
                     
                     clearRequest.onsuccess = function() {
-                        alert("تم تفريغ النظام وإعادة ضبطه بنجاح.\nسيتم تحديث الصفحة الآن.");
                         location.reload(); // إعادة تحميل الصفحة لتنظيف الذاكرة العشوائية
                     };
                     
