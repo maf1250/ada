@@ -1450,16 +1450,16 @@
             <div class="admin-card"><h4>أكثر ${txt.instructors} إلغاءً للجلسات</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">محاضرات ملغاة</th></tr></thead><tbody>${topCanceledInst.map(i => `<tr><td>${i[0]}</td><td class="text-center mono" style="color:var(--info);">${i[1]}</td></tr>`).join('')}</tbody></table></div>
             <div class="admin-card"><h4>أكثر ${txt.instructors} تسجيلاً لرفع الحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">رفع حرمان</th></tr></thead><tbody>${topLiftedInst.length > 0 ? topLiftedInst.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:#ea580c; font-weight:bold;">${i.liftedCount}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا يوجد</td></tr>'}</tbody></table></div>
             <div class="admin-card"><h4>ذروة الغياب (حسب وقت المحاضرة)</h4><table><thead><tr><th>فترة المحاضرة</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topTimeSlots.length > 0 ? topTimeSlots.map(t => `<tr><td dir="ltr" class="text-right mono" style="font-weight:bold;">${t[0]}</td><td class="text-center mono" style="color:var(--danger);">${t[1].toFixed(0)}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا توجد بيانات</td></tr>'}</tbody></table></div>
-            <div class="admin-card" style="grid-column: 1 / -1;"><h4 style="color: var(--primary);">التباين بين المدربين في نفس المقرر (مؤشر توحيد المعايير)</h4><div class="_tableWrapper" style="max-height: none;">
+            <div class="admin-card" style="grid-column: 1 / -1;"><h4 style="color: var(--primary);">التباين بين ${txt.instructors} في نفس المقرر (مؤشر توحيد المعايير)</h4><div class="_tableWrapper" style="max-height: none;">
                     <table>
                         <thead>
                             <tr>
                                 <th>المقرر</th>
-                                <th>المدرب (الأعلى غياباً)</th>
-                                <th class="text-center">متوسط غيابه</th>
-                                <th>المدرب (الأقل غياباً)</th>
-                                <th class="text-center">متوسط غيابه</th>
-                                <th class="text-center">الفارق بينهما</th>
+                                <th>${txt.instructors} (الأعلى غياباً)</th>
+                                <th class="text-center">متوسط الغياب</th>
+                                <th>${txt.instructors} (الأقل غياباً)</th>
+                                <th class="text-center">متوسط الغياب</th>
+                                <th class="text-center">الفارق</th>
                             </tr>
                         </thead>
                         <tbody>
