@@ -1611,7 +1611,7 @@ window.deleteCurrentTerm = async function() {
         if(sortedMajors.length > 0) insights.push({ type: 'danger', text: `تنبيه حرج: تخصص <b>(${sortedMajors[0][0]})</b> هو الأكثر عرضة للفقد الأكاديمي، بمؤشر خطورة مرتفع. يتطلب تدخل الإرشاد الأكاديمي فوراً.` });
         if (terminatedCount > (totalIntake * 0.03)) insights.push({ type: 'danger', text: `تنبيه إداري: لوحظ ارتفاع في حالات <b>(${txt.terminated})</b> بواقع <b>(${terminatedCount})</b> حالة.` });
         let borderline = processedData.percentages.filter(p => p.absPercentage >= 15 && p.absPercentage <= 20).length;
-        if(borderline > 0) insights.push({ type: 'warning', text: `يوجد <b>(${borderline})</b> مقرر في "المنطقة الصفراء" (15% - 20%). نوصي بإرسال رسائل تحذيرية.` });
+        if(borderline > 0) insights.push({ type: 'warning', text: `هناك <b>(${borderline})</b> حالة في "المنطقة الصفراء" (15% - 20%). نوصي بإرسال رسائل تحذيرية لتفادي الحرمان.` });
         if(withdrawn > (totalIntake * 0.05)) insights.push({ type: 'warning', text: `نسبة <b>(${txt.withdrawn})</b> بلغت <b>(${(withdrawn/totalIntake*100).toFixed(1)}%)</b>. يفضل دراسة أسباب التسرب.` });
         if(totalProbable > (totalActive * 0.1)) insights.push({ type: 'info', text: `لوحظ وجود فجوة في رصد الحضور بنسبة مرتفعة. نوصي بالتأكيد على ${txt.instructors} بإغلاق سجلات التحضير.` });
 
