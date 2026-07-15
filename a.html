@@ -653,7 +653,7 @@
 
     window.deleteCurrentTerm = async function() {
         if(termsList.length <= 1) { alert("لا يمكن حذف الفصل الوحيد المتبقي!"); return; }
-        if(confirm(`هل أنت متأكد من حذف بيانات "${activeTermName}" نهائياً؟`)) {
+        if(confirm(`سيتم حذف بيانات "${activeTermName}" نهائياً؟`)) {
             // مسح من IndexedDB (تجاوز حفظه)
             try {
                 let db = await openDB();
@@ -723,7 +723,7 @@
     };
 
     window.deleteReport = async function(type) {
-        if(confirm("هل أنت متأكد من حذف هذا التقرير؟")) {
+        if(confirm("سيتم حذف هذا التقرير")) {
             rawData[type] = []; fileDates[type] = null;
             let dropZone = document.getElementById(`drop-${type}`); dropZone.classList.remove('has-file');
             let pEl = dropZone.querySelector('p');
