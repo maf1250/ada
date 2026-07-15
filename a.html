@@ -594,7 +594,7 @@
     }
 
     window.createNewTerm = async function() {
-        let newName = prompt("نأمل إدخال اسم الفصل التدريبي الجديد للمقارنة (مثال: الفصل الثاني 1447):");
+        let newName = prompt("نأمل إدخال اسم الفصل التدريبي الجديد للمقارنة (مثال: 144620):");
         if(newName && newName.trim() !== "") {
             newName = newName.trim();
             if(termsList.includes(newName)) { alert("هذا الاسم موجود مسبقاً!"); return; }
