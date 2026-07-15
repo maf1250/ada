@@ -1707,7 +1707,7 @@ Object.values(t.crns).forEach(c => {
                     let dlAnchorElem = document.createElement('a');
                     let dateLabel = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
                     dlAnchorElem.setAttribute("href", dataStr);
-                    dlAnchorElem.setAttribute("download", `نسخة_احتياطية_الغياب_${dateLabel}.json`);
+                    dlAnchorElem.setAttribute("download", `نسخة_احتياطية_لنظام_متابعة_الغياب_${dateLabel}.json`);
                     dlAnchorElem.click();
                 }
             };
@@ -1731,7 +1731,7 @@ Object.values(t.crns).forEach(c => {
                     return;
                 }
                 
-                if(confirm("تنبيه خطير: استيراد هذه النسخة سيؤدي إلى مسح جميع الفصول والبيانات الحالية واستبدالها بالنسخة المرفوعة.\n\nهل أنت متأكد من الاستمرار؟")) {
+                if(confirm("تنبيه: استيراد هذه النسخة سيؤدي إلى مسح جميع الفصول والبيانات الحالية واستبدالها بالنسخة المرفوعة.\n\nهل أنت متأكد من الاستمرار؟")) {
                     
                     Object.keys(backup.localStorage).forEach(key => {
                         if(backup.localStorage[key]) {
