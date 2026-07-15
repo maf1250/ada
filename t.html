@@ -316,6 +316,12 @@
         <div class="_navItem" onclick="switchTab('report-percentages', this)">
             <span>نسبة الغياب والإنذارات</span><span class="tab-badge" id="badge-percentages">0</span>
         </div>
+    <div class="_navItem" id="nav-dropout" onclick="switchTab('report-dropout', this)">
+            <span style="color: #c026d3;">خطر الانقطاع المفاجئ</span><span class="tab-badge" id="badge-dropout" style="background:#fdf4ff; color:#c026d3; border-color:#e879f9;">0</span>
+        </div>
+        <div class="_navItem" id="nav-prep-gap" onclick="switchTab('report-prep-gap', this)">
+            <span style="color: #0d9488;">فجوة التحضير (المدربين)</span><span class="tab-badge" id="badge-prep-gap" style="background:#f0fdfa; color:#0d9488; border-color:#2dd4bf;">0</span>
+        </div>
         <div class="_navItem" id="nav-fullweek" onclick="switchTab('report-fullweek', this)">
             <span>غياب أسبوع كامل فأكثر</span><span class="tab-badge" id="badge-fullweek">0</span>
         </div>
@@ -449,6 +455,8 @@
             <div id="report-main" class="tab-content hidden"><div class="_tableWrapper" id="table-main"></div></div>
             <div id="report-matrix" class="tab-content hidden"><div class="_tableWrapper" id="table-matrix"></div></div>
             <div id="report-percentages" class="tab-content hidden"><div class="_tableWrapper" id="table-percentages"></div></div>
+            <div id="report-dropout" class="tab-content hidden"><div class="_tableWrapper" id="table-dropout"></div></div>
+            <div id="report-prep-gap" class="tab-content hidden"><div class="_tableWrapper" id="table-prep-gap"></div></div>
             <div id="report-fullweek" class="tab-content hidden"><div class="_tableWrapper" id="table-fullweek"></div></div>
             <div id="report-threatened" class="tab-content hidden"><div class="_tableWrapper" id="table-threatened"></div></div>
             <div id="report-deprived-all" class="tab-content hidden"><div class="_tableWrapper" id="table-deprived-all"></div></div>
@@ -1130,6 +1138,7 @@
         });
 
         processedData.active = []; processedData.excluded = []; processedData.percentages = [];
+        processedData.dropoutRisks = []; processedData.prepGaps = [];
 
        Object.values(traineesMap).forEach(t => {
             let isFullyExcluded = t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي') || t.courseCodes.size === 0;
@@ -1205,6 +1214,39 @@
         processedData.percentages.sort((a, b) => b.absPercentage - a.absPercentage);
         processedData.instructors.sort((a, b) => b.avgPct - a.avgPct);
         processedData.sections.sort((a, b) => b.avgPct - a.avgPct);
+
+        // --- خوارزميات التقارير التحليلية الجديدة ---
+        
+        // 1. تحديد ما هو "الأسبوع الحالي" بناءً على أحدث بيانات تم رصدها في النظام
+        let currentWeek = Math.max(...Object.keys(TTH || {1:1}).map(Number));
+        if(!isFinite(currentWeek) || currentWeek < 1) currentWeek = 1;
+
+        // 2. تحليل خطر الانقطاع المفاجئ
+        if (currentWeek > 1) {
+            processedData.active.forEach(t => {
+                let thisWeekStatus = t.weekStatuses[currentWeek];
+                let lastWeekStatus = t.weekStatuses[currentWeek - 1];
+                // الشرط: غاب الأسبوع الحالي غياباً كاملاً، لكنه كان حاضراً أو غيابه جزئي في الأسبوع الذي قبله
+                if (thisWeekStatus === 'كامل' && (lastWeekStatus === '-' || lastWeekStatus === 'جزئي')) {
+                    processedData.dropoutRisks.push(t);
+                }
+            });
+        }
+
+        // 3. تحليل فجوة التحضير (المدربين المتأخرين)
+        processedData.sections.forEach(sec => {
+            // نتحقق إذا كانت الشعبة لم يُسجل لها أي حضور/غياب في الأسبوع الحالي
+            let hasBeenTaught = (TTH[currentWeek] && TTH[currentWeek][sec.crn]) ? TTH[currentWeek][sec.crn] : 0;
+            if (hasBeenTaught === 0) {
+                processedData.prepGaps.push({
+                    instName: sec.instName, instId: sec.instId, crn: sec.crn, courseName: sec.name, week: currentWeek
+                });
+            }
+        });
+
+        // تحديث الباجات (Badges) للتقارير الجديدة
+        if(document.getElementById('badge-dropout')) document.getElementById('badge-dropout').innerText = processedData.dropoutRisks.length;
+        if(document.getElementById('badge-prep-gap')) document.getElementById('badge-prep-gap').innerText = processedData.prepGaps.length;
         
         document.getElementById('badge-main').innerText = processedData.active.length;
         document.getElementById('badge-matrix').innerText = processedData.active.length;
@@ -1533,7 +1575,21 @@ Object.values(t.crns).forEach(c => {
         });
         htmlPerc += `</tbody></table>`; document.getElementById('table-percentages').innerHTML = htmlPerc;
         htmlThreatened += `</tbody></table>`; document.getElementById('table-threatened').innerHTML = htmlThreatened;
+// رسم جدول خطر الانقطاع المفاجئ
+        let htmlDropout = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th><th class="nowrap sortable" onclick="sortTable(this, 2, false)">التخصص</th><th class="nowrap text-center sortable" onclick="sortTable(this, 3, false)">حالة الأسبوع السابق (${currentWeek-1})</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, false)">حالة الأسبوع الحالي (${currentWeek})</th><th class="nowrap text-center">تنبيه الإرشاد</th></tr>${createFilterRow(6, [5])}</thead><tbody>`;
+        processedData.dropoutRisks.forEach(t => {
+            htmlDropout += `<tr><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td><td class="text-center"><span class="badge ${t.weekStatuses[currentWeek-1] === '-' ? 'badge-success' : 'badge-warning'}">${t.weekStatuses[currentWeek-1] === '-' ? 'منتظم' : 'غياب جزئي'}</span></td><td class="text-center"><span class="badge badge-danger">انقطاع كامل</span></td><td class="text-center"><button class="btn-action" style="padding:4px 8px; font-size:10.5px; background:var(--bg-elevated);" onclick="openTraineeProfile('${t.id}')">استعراض الحالة</button></td></tr>`;
+        });
+        htmlDropout += `</tbody></table>`;
+        if(document.getElementById('table-dropout')) document.getElementById('table-dropout').innerHTML = htmlDropout;
 
+        // رسم جدول فجوة التحضير (تقصير المدربين)
+        let htmlPrepGap = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">الرقم الوظيفي</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">اسم ${colInst}</th><th class="nowrap sortable" onclick="sortTable(this, 2, false)">رمز المقرر</th><th class="nowrap sortable" onclick="sortTable(this, 3, false)">اسم المقرر</th><th class="nowrap sortable text-center" onclick="sortTable(this, 4, false)">الشعبة</th><th class="nowrap text-center sortable" onclick="sortTable(this, 5, true)">الأسبوع المتأخر</th></tr>${createFilterRow(6)}</thead><tbody>`;
+        processedData.prepGaps.forEach(g => {
+            htmlPrepGap += `<tr><td class="mono">${g.instId || '-'}</td><td class="name-cell" style="color:var(--danger); font-weight:bold;">${g.instName}</td><td class="mono">${g.courseName.split(' ')[0]}</td><td>${g.courseName}</td><td class="mono text-center">${g.crn}</td><td class="text-center mono"><span class="badge" style="background:#f0fdfa; color:#0d9488; border:1px solid #2dd4bf;">الأسبوع ${g.week}</span></td></tr>`;
+        });
+        htmlPrepGap += `</tbody></table>`;
+        if(document.getElementById('table-prep-gap')) document.getElementById('table-prep-gap').innerHTML = htmlPrepGap;
         if (window.savedFilters) {
             ['filterMajor', 'filterStatus', 'filterAbsence', 'searchInput'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = window.savedFilters[id.replace('filter','').toLowerCase()] || ''; });
         }
