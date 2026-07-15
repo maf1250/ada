@@ -274,10 +274,17 @@
 
 <div class="_shell">
     <div class="_sidebar">
+        <!-- 1. الترويسة وأسماء المطورين -->
         <div style="padding: 0 var(--sp-4) var(--sp-4); border-bottom: 1px solid var(--border); margin-bottom: var(--sp-2);">
             <h2 style="margin: 0; color: var(--primary); font-size: var(--fs-lg);">نظام متابعة غياب المتدربين</h2>
+            <div class="credits">
+                <b>إعداد وتطوير:</b><br>
+                أ. منصور عبدالعزيز الفايز<br>
+                م. محمد يوسف الشبيلي
             </div>
+        </div>
         
+        <!-- 2. أداة اختيار الفصول التدريبية -->
         <div style="padding: 10px 15px; border-bottom: 1px solid var(--border); background: var(--bg-surface);">
             <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">الفصل التدريبي الفعال:</div>
             <select id="termSelector" class="input-select" style="width: 100%; margin-bottom: 8px; font-weight: bold; color: var(--primary);" onchange="switchTerm()"></select>
@@ -287,13 +294,7 @@
             </div>
         </div>
         
-            <div class="credits">
-                <b>إعداد وتطوير:</b><br>
-                أ. منصور عبدالعزيز الفايز<br>
-                م. محمد يوسف الشبيلي
-            </div>
-        </div>
-        
+        <!-- 3. أزرار التنقل (القائمة الجانبية) -->
         <div class="_navItem active" id="nav-upload" onclick="switchTab('upload', this)">
             <span>رفع البيانات</span>
         </div>
@@ -316,7 +317,7 @@
         <div class="_navItem" onclick="switchTab('report-percentages', this)">
             <span>نسبة الغياب والإنذارات</span><span class="tab-badge" id="badge-percentages">0</span>
         </div>
-    <div class="_navItem" id="nav-dropout" onclick="switchTab('report-dropout', this)">
+        <div class="_navItem" id="nav-dropout" onclick="switchTab('report-dropout', this)">
             <span style="color: #c026d3;">خطر الانقطاع المفاجئ</span><span class="tab-badge" id="badge-dropout" style="background:#fdf4ff; color:#c026d3; border-color:#e879f9;">0</span>
         </div>
         <div class="_navItem" id="nav-prep-gap" onclick="switchTab('report-prep-gap', this)">
@@ -341,7 +342,7 @@
         <div class="visitor-counter">
             <img src="https://visitor-badge.laobi.icu/badge?page_id=https%3A%2F%2Fmaf1250.github.io%2Faudit&radius=8" alt=""/>
         </div>
-    </div>
+    </div> 
 
     <div class="_main">
         <div class="_header">
