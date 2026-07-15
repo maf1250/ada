@@ -460,7 +460,7 @@
     </div>
 </div>
 
-<!-- Modal الملف الشخصي للمتدرب -->
+<!-- الملف الشخصي للمتدرب -->
 <div id="traineeProfileModal" class="modal-overlay">
     <div class="modal-content wide">
         <div class="modal-header">
@@ -470,16 +470,16 @@
         <div class="profile-grid">
             <div class="profile-item"><span>الرقم الأكاديمي</span><strong id="tp-id" class="mono"></strong></div>
             <div class="profile-item"><span>التخصص</span><strong id="tp-major"></strong></div>
-            <div class="profile-item"><span>حالة التسجيل</span><strong id="tp-reg-status"></strong></div>
-            <div class="profile-item"><span>الحالة العامة</span><strong id="tp-status"></strong></div>
+            <div class="profile-item"><span>الحالة العامة للمتدرب</span><strong id="tp-status"></strong></div>
             <div class="profile-item"><span>الجوال</span><strong id="tp-phone" class="mono"></strong></div>
-            <div class="profile-item"><span>إجمالي عدد مقررات الحرمان</span><strong id="tp-deprived" style="color:var(--danger)"></strong></div>
+            <div class="profile-item"><span>إجمالي مقررات الحرمان</span><strong id="tp-deprived" style="color:var(--danger)"></strong></div>
+            <div class="profile-item"><span>مقررات تم رفع حرمانها</span><strong id="tp-lifted" style="color:#ea580c"></strong></div>
         </div>
         
-        <h4 style="margin: 20px 0 10px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px;">تفاصيل المقررات ونسبة الغياب</h4>
+        <h4 style="margin: 20px 0 10px; color: var(--primary); border-bottom: 1px dashed var(--border); padding-bottom: 8px;">تفاصيل المقررات وحالة التسجيل</h4>
         <div class="_tableWrapper" style="max-height: 250px; margin-bottom: 20px;">
             <table id="tp-courses-table">
-                <thead><tr><th>المقرر</th><th class="text-center">الشعبة</th><th class="text-center">ساعات الغياب</th><th class="text-center">نسبة الغياب</th><th class="text-center">حالة الحرمان</th></tr></thead>
+                <thead><tr><th>المقرر</th><th class="text-center">الشعبة</th><th class="text-center">ساعات الغياب</th><th class="text-center">النسبة</th><th class="text-center">حالة التسجيل للمقرر</th><th class="text-center">حالة الحرمان</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
@@ -490,7 +490,7 @@
         </div>
     </div>
 </div>
-
+    
 <script>
     // تحديد الثيم
     const themeBtn = document.getElementById('themeToggle');
@@ -939,7 +939,7 @@
             }
         }
 
-        let traineesMap = {};
+     let traineesMap = {};
         rawData.sf01.forEach(row => {
             let id = row['رقم المتدرب'] || row['رقم المتدربة']; if(!id) return;
             let name = row['إسم المتدرب'] || row['اسم المتدرب'] || row['إسم المتدربة'] || row['اسم المتدربة'];
@@ -950,23 +950,30 @@
             if(major) majorsSet.add(major.trim()); if(traineeStatus) statusesSet.add(traineeStatus.trim());
 
             if(!traineesMap[id]) {
-                traineesMap[id] = { id: id, name: name, major: major, phone: row['رقم الجوال'], regStatus: regStatus, traineeStatus: traineeStatus, crns: {}, courseCodes: new Set(), weeklyCrnAbsences: {}, weekStatuses: {}, weeksAbsentCount: 0, totalUniqueCourses: 0, totalDeprivedCourses: 0 };
+                traineesMap[id] = { id: id, name: name, major: major, phone: row['رقم الجوال'], traineeStatus: traineeStatus, crns: {}, courseCodes: new Set(), weeklyCrnAbsences: {}, weekStatuses: {}, weeksAbsentCount: 0, totalUniqueCourses: 0, totalDeprivedCourses: 0 };
             }
             
             let crn = row['الرقم المرجعي']; let courseCode = row['المقرر']; let courseName = row['اسم المقرر'] || row['عنوان المقرر'];
-            let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي'); let isDeprived = (grade === 'ح'); 
+            let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي'); 
+            let isDeprived = (grade === 'ح'); 
+            let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
 
             if(crn && courseCode && !isCourseExcluded) {
                 traineesMap[id].courseCodes.add(courseCode);
                 if (!traineesMap[id].crns[crn]) {
                     let ch = courseHours[crn] || 0;
-                    traineesMap[id].crns[crn] = { code: courseCode, name: courseName, hours: ch, absHours: 0, isOfficiallyDeprived: isDeprived };
-                } else if (isDeprived) traineesMap[id].crns[crn].isOfficiallyDeprived = true;
+                    traineesMap[id].crns[crn] = { code: courseCode, name: courseName, hours: ch, absHours: 0, isOfficiallyDeprived: isDeprived, regStatus: regStatus, isLifted: isLifted };
+                } else {
+                    if (isDeprived) traineesMap[id].crns[crn].isOfficiallyDeprived = true;
+                    if (isLifted) traineesMap[id].crns[crn].isLifted = true;
+                    traineesMap[id].crns[crn].regStatus = regStatus; // تحديث بأحدث حالة
+                }
                 
-                // تحديث بيانات الشُعب (Sections)
+                // تحديث بيانات الشُعب والمدربين لحالات الرفع
                 if(crnMap[crn]) {
                     crnMap[crn].enrolled++;
                     if(isDeprived) crnMap[crn].deprived++;
+                    if(isLifted) crnMap[crn].liftedCount = (crnMap[crn].liftedCount || 0) + 1;
                 }
             }
         });
@@ -1015,10 +1022,10 @@
 
         processedData.active = []; processedData.excluded = []; processedData.percentages = [];
 
-        Object.values(traineesMap).forEach(t => {
-            let isFullyExcluded = t.regStatus.includes('انسحاب') || t.regStatus.includes('مطوي') || t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي');
-            if(isFullyExcluded || t.courseCodes.size === 0) { t.totalUniqueCourses = t.courseCodes.size; processedData.excluded.push(t); return; }
-
+       Object.values(traineesMap).forEach(t => {
+            let isFullyExcluded = t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي') || t.courseCodes.size === 0;
+            if(isFullyExcluded) { t.totalUniqueCourses = t.courseCodes.size; processedData.excluded.push(t); return; }
+           
             t.deprivedCourseCodes = new Set(); 
             Object.keys(t.crns).forEach(crn => {
                 let crnData = t.crns[crn]; let totalCrnHours = crnData.hours * totalWeeks;
@@ -1027,8 +1034,8 @@
                 
                 if(crnMap[crn]) crnMap[crn].totalAbsPct += crnData.absPercentage;
 
-                if(crnData.absPercentage > 0) {
-                    processedData.percentages.push({ traineeName: t.name, traineeId: t.id, phone: t.phone, major: t.major, traineeStatus: t.traineeStatus, courseCode: crnData.code, courseName: crnData.name, crn: crn, absPercentage: crnData.absPercentage, isDeprived: crnData.isOfficiallyDeprived });
+               if(crnData.absPercentage > 0) {
+                    processedData.percentages.push({ traineeName: t.name, traineeId: t.id, phone: t.phone, major: t.major, traineeStatus: t.traineeStatus, courseCode: crnData.code, courseName: crnData.name, crn: crn, absPercentage: crnData.absPercentage, isDeprived: crnData.isOfficiallyDeprived, isLifted: crnData.isLifted });
                 }
             });
 
@@ -1066,10 +1073,11 @@
                 section.crn = crn; section.avgPct = section.totalAbsPct / section.enrolled;
                 processedData.sections.push(section);
 
-                let iId = section.instId; let iName = section.instName;
+               let iId = section.instId; let iName = section.instName;
                 if(iId && iName) {
-                    if(!instMap[iId]) instMap[iId] = { id: iId, name: iName, crnCount: 0, totalEnrolled: 0, totalDeprived: 0, totalAbsPctSum: 0 };
+                    if(!instMap[iId]) instMap[iId] = { id: iId, name: iName, crnCount: 0, totalEnrolled: 0, totalDeprived: 0, totalAbsPctSum: 0, liftedCount: 0 };
                     instMap[iId].crnCount++; instMap[iId].totalEnrolled += section.enrolled; instMap[iId].totalDeprived += section.deprived; instMap[iId].totalAbsPctSum += section.avgPct;
+                    instMap[iId].liftedCount += (section.liftedCount || 0);
                 }
             }
         });
@@ -1116,27 +1124,32 @@
     };
 
     window.openTraineeProfile = function(id) {
-        // توحيد نوع البيانات (نص) لضمان تطابق رقم المتدرب
         let trainee = processedData.active.find(t => String(t.id) === String(id)) || processedData.excluded.find(t => String(t.id) === String(id));
-        if(!trainee) {
-            alert("عذراً، لم يتم العثور على التفاصيل.");
-            return;
-        }
+        if(!trainee) { alert("عذراً، لم يتم العثور على التفاصيل."); return; }
         
+        let traineeLiftedCount = trainee.crns ? Object.values(trainee.crns).filter(c => c.isLifted).length : 0;
+
         document.getElementById('tp-name').innerText = trainee.name;
         document.getElementById('tp-id').innerText = trainee.id;
         document.getElementById('tp-major').innerText = trainee.major || '-';
-        document.getElementById('tp-reg-status').innerText = trainee.regStatus || '-';
         document.getElementById('tp-status').innerText = trainee.traineeStatus || '-';
         document.getElementById('tp-phone').innerText = window.formatPhone(trainee.phone) || '-';
         document.getElementById('tp-deprived').innerText = trainee.totalDeprivedCourses || 0;
+        document.getElementById('tp-lifted').innerText = traineeLiftedCount;
 
         let tbody = document.querySelector('#tp-courses-table tbody'); tbody.innerHTML = '';
-        Object.keys(trainee.crns).forEach(crn => {
-            let c = trainee.crns[crn];
-            let badge = c.isOfficiallyDeprived ? '<span class="badge badge-danger">حرمان</span>' : '<span class="badge badge-success">مستمر</span>';
-            tbody.innerHTML += `<tr><td>${c.name}</td><td class="text-center mono">${crn}</td><td class="text-center mono">${c.absHours}</td><td class="text-center mono" style="color:${c.absPercentage>=15?'var(--danger)':'inherit'}">${c.absPercentage.toFixed(1)}%</td><td class="text-center">${badge}</td></tr>`;
-        });
+        if(trainee.crns) {
+            Object.keys(trainee.crns).forEach(crn => {
+                let c = trainee.crns[crn];
+                let badge = '';
+                if (c.isLifted) badge = '<span class="badge" style="background:rgba(249, 115, 22, 0.15); color:#ea580c; border:1px solid #ea580c;">رفع حرمان</span>';
+                else if (c.isOfficiallyDeprived) badge = '<span class="badge badge-danger">حرمان</span>';
+                else if (c.absPercentage > 20) badge = '<span class="badge badge-danger" style="background:#ea580c26; color:#ea580c; border-color:#ea580c;">تجاوز 20%</span>';
+                else badge = '<span class="badge badge-success">مستمر</span>';
+                
+                tbody.innerHTML += `<tr><td>${c.name}</td><td class="text-center mono">${crn}</td><td class="text-center mono">${c.absHours}</td><td class="text-center mono" style="color:${c.absPercentage>=15?'var(--danger)':'inherit'}">${c.absPercentage.toFixed(1)}%</td><td class="text-center" style="font-size:10px; color:var(--text-muted);">${c.regStatus || '-'}</td><td class="text-center">${badge}</td></tr>`;
+            });
+        }
 
         let ul = document.getElementById('tp-absence-list'); ul.innerHTML = '';
         let details = fullTraineeSessionDetails[trainee.id] || [];
@@ -1153,7 +1166,6 @@
         
         document.getElementById('traineeProfileModal').classList.add('active');
     };
-
     window.closeTraineeProfile = function() { document.getElementById('traineeProfileModal').classList.remove('active'); };
 
     window.renderDashboard = function() {
@@ -1161,7 +1173,8 @@
         let currentWeek = Math.max(...Object.keys(TTH || {1:0}).map(Number)); 
         let totalProbable = processedData.active.filter(t => t.weekStatuses[currentWeek] === 'محتمل').length;
         const totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18;
-        
+        let totalLifted = processedData.instructors.reduce((sum, i) => sum + (i.liftedCount || 0), 0);
+        let topLiftedInst = processedData.instructors.filter(i => i.liftedCount > 0).sort((a, b) => b.liftedCount - a.liftedCount).slice(0, 5);
         let totalActive = processedData.active.length; let totalExcluded = processedData.excluded.length;
         let majorsCount = new Set(processedData.active.concat(processedData.excluded).map(t => t.major)).size;
         let crnsCount = new Set(rawData.ss01.map(r => r['الرقم المرجعي'] || r['CRN'])).size;
@@ -1184,7 +1197,6 @@
 
         let html = `<div class="dash-grid">
             <div class="dash-card" onclick="drillDown('absence', '')" style="border-bottom: 3px solid var(--primary);"><h4>إجمالي ${txt.trainees}</h4><div class="val">${totalActive + totalExcluded}</div><div class="sub-val">${totalActive} ${txt.current} | ${totalExcluded} ${txt.leftOut}</div></div>
-            <div class="dash-card" style="border-bottom: 3px solid var(--primary);"><h4>التخصصات</h4><div class="val">${majorsCount}</div><div class="sub-val">عدد التخصصات في الوحدة</div></div>
             <div class="dash-card" style="border-bottom: 3px solid var(--primary);"><h4>الشعب والمقررات</h4><div class="val">${coursesCount}</div><div class="sub-val">${coursesCount} مقرر | ${crnsCount} شعبة</div></div>
             <div class="dash-card" style="border-bottom: 3px solid var(--danger);"><h4>${txt.deprived}</h4><div class="val" style="color: var(--danger);">${deprivedTrainees}</div><div class="sub-val">${txt.DA}</div></div>
             <div class="dash-card" style="border-bottom: 3px solid #ea580c;"><h4>${txt.over20}</h4><div class="val" style="color: #ea580c;">${over20Trainees}</div><div class="sub-val">${txt.DAeligible}</div></div>
@@ -1193,6 +1205,7 @@
             <div class="dash-card" onclick="switchTab('report-excluded', document.getElementById('nav-excluded'))" style="border-bottom: 3px solid #7c2d12;"><h4>${txt.terminated}</h4><div class="val">${terminatedCount}</div><div class="sub-val">عمليات طي القيد</div></div>
             <div class="dash-card" onclick="switchTab('report-excluded', document.getElementById('nav-excluded'))" style="border-bottom: 3px solid var(--text-muted);"><h4>${txt.withdrawn}</h4><div class="val">${withdrawn}</div><div class="sub-val">انسحاب رسمي</div></div>
             <div class="dash-card" style="border-bottom: 3px solid #facc15;"><h4>${txt.borderline}</h4><div class="val" style="color: #facc15;">${borderlineCount}</div><div class="sub-val">نسبة الغياب بين 18% و 20%</div></div>
+            <div class="dash-card" style="border-bottom: 3px solid #ea580c;"><h4>حالات رفع الحرمان</h4><div class="val" style="color: #ea580c;">${totalLifted}</div><div class="sub-val">إجمالي الحالات</div></div>
             <div class="dash-card" style="border-bottom: 3px solid #3b82f6;"><h4>فجوة التحضير (المحتمل)</h4><div class="val" style="color: #3b82f6;">${totalProbable}</div><div class="sub-val">لم يتم رصد حضور/غياب للأسبوع ${currentWeek}</div></div>
             <div class="dash-card" style="border-bottom: 3px solid var(--info);"><h4>متوسط غياب المقرر</h4><div class="val">${avgAbsence.toFixed(1)}%</div><div class="sub-val">بناءً على ${allAbsPercentages.length} سجل</div></div>
         </div>
@@ -1268,6 +1281,7 @@
             <div class="admin-card"><h4>أكثر الأيام تسجيلاً للغياب</h4><table><thead><tr><th>اليوم</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topDays.map(d => `<tr><td>${d[0]}</td><td class="text-center mono">${d[1].toFixed(0)}</td></tr>`).join('')}</tbody></table></div>
             <div class="admin-card"><h4>أعلى ${txt.instructors} نسبةً للحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">النسبة (%)</th></tr></thead><tbody>${topInstructorsByDepPct.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:var(--danger);">${i.pct.toFixed(1)}%</td></tr>`).join('')}</tbody></table></div>
             <div class="admin-card"><h4>أكثر ${txt.instructors} إلغاءً للجلسات</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">محاضرات ملغاة</th></tr></thead><tbody>${topCanceledInst.map(i => `<tr><td>${i[0]}</td><td class="text-center mono" style="color:var(--info);">${i[1]}</td></tr>`).join('')}</tbody></table></div>
+            <div class="admin-card"><h4>أكثر ${txt.instructors} تسجيلاً لرفع الحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">رفع حرمان</th></tr></thead><tbody>${topLiftedInst.length > 0 ? topLiftedInst.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:#ea580c; font-weight:bold;">${i.liftedCount}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا يوجد</td></tr>'}</tbody></table></div>
 </div>`;
 
         let insights = []; let totalIntake = totalActive + totalExcluded; 
@@ -1349,7 +1363,14 @@ let htmlSec = `<table><thead><tr>
         processedData.active.forEach(t => {
             let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
             htmlMatrix += `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td><td><div class="course-card-wrapper">`;
-            Object.values(t.crns).forEach(c => { let cardClass = 'c-success'; let pctText = c.absPercentage.toFixed(1) + '%'; if (c.isOfficiallyDeprived) { cardClass = 'c-danger'; pctText = `${isFemale ? 'محرومة (ح)' : 'محروم (ح)'} | ${c.absPercentage.toFixed(1)}%`; } else if (c.absPercentage > 20) cardClass = 'c-danger'; else if (c.absPercentage >= 15) cardClass = 'c-warning'; htmlMatrix += `<div class="course-card ${cardClass}"><span>${c.name} <span style="opacity:0.7; font-size:10px;">(${c.code})</span></span><span class="pct">${pctText}</span></div>`; });
+Object.values(t.crns).forEach(c => { 
+    let cardClass = 'c-success'; let pctText = c.absPercentage.toFixed(1) + '%'; let customStyle = '';
+    if (c.isLifted) { cardClass = ''; customStyle = 'border-color:#f97316; background:rgba(249,115,22,0.15); color:#f97316;'; pctText = `رفع حرمان | ${c.absPercentage.toFixed(1)}%`; }
+    else if (c.isOfficiallyDeprived) { cardClass = 'c-danger'; pctText = `${isFemale ? 'محرومة (ح)' : 'محروم (ح)'} | ${c.absPercentage.toFixed(1)}%`; } 
+    else if (c.absPercentage > 20) { cardClass = 'c-danger'; } 
+    else if (c.absPercentage >= 15) { cardClass = 'c-warning'; } 
+    htmlMatrix += `<div class="course-card ${cardClass}" style="${customStyle}"><span>${c.name} <span style="opacity:0.7; font-size:10px;">(${c.code})</span></span><span class="pct">${pctText}</span></div>`; 
+});
             htmlMatrix += `</div></td></tr>`;
         });
         htmlMatrix += `</tbody></table>`; document.getElementById('table-matrix').innerHTML = htmlMatrix;
@@ -1369,7 +1390,7 @@ let htmlSec = `<table><thead><tr>
             let safeStatus = p.traineeStatus ? p.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = p.major ? p.major.replace(/"/g, '&quot;') : '';
             let msg = currentWaTemplate.replace(/{name}/g, p.traineeName).replace(/{course}/g, p.courseName).replace(/{pct}/g, p.absPercentage.toFixed(1));
             let waUrl = `https://api.whatsapp.com/send?phone=${window.formatPhone(p.phone)}&text=${encodeURIComponent(msg)}`;
-            let statusBadge = p.isDeprived ? `<span class="badge badge-danger">${isFemale?'محرومة (ح)':'محروم (ح)'}</span>` : (p.absPercentage > 20 ? '<span class="badge badge-danger" style="background:#ea580c26; color:#ea580c; border-color:#ea580c;">تجاوز 20%</span>' : (p.absPercentage >= 15 ? '<span class="badge badge-warning">إنذار</span>' : '<span class="badge badge-success">طبيعي</span>'));
+            let statusBadge = p.isLifted ? '<span class="badge" style="background:rgba(249,115,22,0.15); color:#ea580c; border:1px solid #ea580c;">رفع حرمان</span>' : (p.isDeprived ? `<span class="badge badge-danger">${isFemale?'محرومة (ح)':'محروم (ح)'}</span>` : (p.absPercentage > 20 ? '<span class="badge badge-danger" style="background:#ea580c26; color:#ea580c; border-color:#ea580c;">تجاوز 20%</span>' : (p.absPercentage >= 15 ? '<span class="badge badge-warning">إنذار</span>' : '<span class="badge badge-success">طبيعي</span>')));
             let rowHtml = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="true"><td class="mono">${p.traineeId}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${p.traineeId}'); return false;">${p.traineeName}</a></td><td class="mono">${p.courseCode}</td><td>${p.courseName}</td><td class="mono">${p.crn}</td><td class="mono text-center" style="color: ${p.absPercentage >= 15 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: bold;">${p.absPercentage.toFixed(1)}%</td><td class="text-center">${statusBadge}</td><td class="text-center nowrap"><a href="${waUrl}" target="_blank" class="btn-whatsapp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> إرسال واتساب</a></td></tr>`;
             htmlPerc += rowHtml;
             if (p.absPercentage >= 18 && p.absPercentage <= 20) {
