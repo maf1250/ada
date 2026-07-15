@@ -349,6 +349,15 @@
                 
                 <label style="font-size: 13px; color: var(--text-secondary); font-weight: 600;">الأسابيع:</label>
                 <input type="number" id="totalWeeks" class="input-number" style="margin-left: 0; width: 60px;" value="18" onchange="processData()">
+
+                <button class="btn-action" style="margin-right: 15px; padding: 4px 8px; color: var(--info);" title="استيراد نسخة احتياطية (JSON)" onclick="document.getElementById('backupFileInput').click()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                </button>
+                <input type="file" id="backupFileInput" style="display:none" accept=".json" onchange="importBackup(event)">
+                
+                <button class="btn-action" style="margin-right: 5px; padding: 4px 8px; color: var(--success);" title="تصدير نسخة احتياطية (JSON)" onclick="exportBackup()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
                 
                 <button class="btn-action" style="margin-right: 10px;" title="تصدير اكسل" onclick="exportExcel()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -1665,6 +1674,97 @@ Object.values(t.crns).forEach(c => {
             } catch(e) { switchTab('upload', document.getElementById('nav-upload')); }
         } else switchTab('upload', document.getElementById('nav-upload'));
     });
+
+    window.exportBackup = async function() {
+        try {
+            let backupData = {
+                localStorage: {
+                    abs_reports_settings: localStorage.getItem('abs_reports_settings'),
+                    abs_terms_list: localStorage.getItem('abs_terms_list'),
+                    abs_active_term: localStorage.getItem('abs_active_term'),
+                    wa_template_f: localStorage.getItem('wa_template_f'),
+                    wa_template_m: localStorage.getItem('wa_template_m'),
+                    appTheme: localStorage.getItem('appTheme')
+                },
+                indexedDB: {}
+            };
+
+            let db = await openDB();
+            let transaction = db.transaction(['store'], 'readonly');
+            let store = transaction.objectStore('store');
+            let request = store.openCursor();
+            
+            request.onsuccess = function(e) {
+                let cursor = e.target.result;
+                if (cursor) {
+                    backupData.indexedDB[cursor.key] = cursor.value;
+                    cursor.continue();
+                } else {
+                    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+                    let dlAnchorElem = document.createElement('a');
+                    let dateLabel = new Date().toLocaleDateString('en-GB').replace(/\//g, '-');
+                    dlAnchorElem.setAttribute("href", dataStr);
+                    dlAnchorElem.setAttribute("download", `نسخة_احتياطية_الغياب_${dateLabel}.json`);
+                    dlAnchorElem.click();
+                }
+            };
+        } catch(e) {
+            alert("حدث خطأ أثناء استخراج النسخة الاحتياطية.");
+            console.error(e);
+        }
+    };
+
+    window.importBackup = function(e) {
+        let file = e.target.files[0];
+        if(!file) return;
+        
+        let reader = new FileReader();
+        reader.onload = async function(evt) {
+            try {
+                let backup = JSON.parse(evt.target.result);
+                
+                if(!backup.localStorage || !backup.indexedDB) {
+                    alert("ملف النسخة الاحتياطية غير صالح أو تالف!");
+                    return;
+                }
+                
+                if(confirm("تنبيه خطير: استيراد هذه النسخة سيؤدي إلى مسح جميع الفصول والبيانات الحالية واستبدالها بالنسخة المرفوعة.\n\nهل أنت متأكد من الاستمرار؟")) {
+                    
+                    Object.keys(backup.localStorage).forEach(key => {
+                        if(backup.localStorage[key]) {
+                            localStorage.setItem(key, backup.localStorage[key]);
+                        } else {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                    
+                    let db = await openDB();
+                    let tx = db.transaction(['store'], 'readwrite');
+                    let store = tx.objectStore('store');
+                    
+                    let clearReq = store.clear();
+                    clearReq.onsuccess = function() {
+                        let keys = Object.keys(backup.indexedDB);
+                        
+                        let putNext = function(i) {
+                            if(i < keys.length) {
+                                store.put(backup.indexedDB[keys[i]], keys[i]).onsuccess = () => putNext(i + 1);
+                            } else {
+                                alert("تم استيراد النظام بنجاح! سيتم تحديث الصفحة الآن.");
+                                location.reload(); // إعادة تحميل لتطبيق البيانات الجديدة
+                            }
+                        };
+                        putNext(0); // بدء الاستعادة
+                    };
+                }
+            } catch(error) {
+                alert("تعذر قراءة الملف! يرجى التأكد أنه ملف (JSON) صحيح.");
+                console.error(error);
+            }
+        };
+        reader.readAsText(file);
+        e.target.value = ''; 
+         };
 </script>
 </body>
 </html>
