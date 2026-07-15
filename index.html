@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ar" dir="rtl" data-theme="dark">
 <head>
@@ -257,6 +256,17 @@
             .profile-grid { grid-template-columns: 1fr; }
         }
 
+        .comp-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 15px; text-align: center; position: relative; overflow: hidden; }
+.comp-card h4 { margin: 0 0 15px 0; color: var(--text-secondary); font-size: 13px; }
+.comp-values { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; }
+.comp-val-box { display: flex; flex-direction: column; align-items: center; }
+.comp-val { font-size: 18px; font-weight: 800; font-family: Tahoma, sans-serif; color: var(--text-primary); }
+.comp-label { font-size: 11px; color: var(--text-muted); }
+.comp-variance { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 6px; border-radius: 4px; font-size: 13px; font-weight: bold; direction: ltr; }
+.variance-good { background: var(--success-subtle); color: var(--success); }
+.variance-bad { background: var(--danger-subtle); color: var(--danger); }
+.variance-neutral { background: var(--bg-hover); color: var(--text-secondary); }
+
         @media print {
             ._sidebar, ._header, ._filtersBar, ._uploadGrid, .info-card, .btn-action, .visitor-counter, .filter-row { display: none !important; }
             ._shell { display: block; height: auto; }
@@ -344,6 +354,7 @@
                     <div style="display: flex; align-items: center; border-right: 1px solid var(--border); padding-right: 4px; margin-right: 2px; height: 20px;">
                         <button style="background: transparent; border: none; cursor: pointer; color: var(--text-primary); font-size: 16px; padding: 0 6px; transition: color 0.2s;" title="إضافة فصل جديد للمقارنة" onmouseover="this.style.color='var(--success)'" onmouseout="this.style.color='var(--text-primary)'" onclick="createNewTerm()">+</button>
                         <button style="background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 13px; padding: 0 6px; transition: color 0.2s;" title="حذف الفصل" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text-muted)'" onclick="deleteCurrentTerm()">✖</button>
+                        <button style="background: transparent; border: none; cursor: pointer; color: var(--info); font-size: 14px; padding: 0 6px; transition: transform 0.2s;" title="مقارنة الفصول" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'" onclick="openComparisonModal()">📊</button>
                     </div>
                 </div>
                 
@@ -492,6 +503,76 @@
     </div>
 </div>
 
+    <!-- Modal التقرير الشامل لتباين المدربين -->
+<div id="varianceModal" class="modal-overlay">
+    <div class="modal-content wide" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 10px; color: var(--primary);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                التقرير الشامل: التباين بين المدربين في نفس المقرر
+            </h3>
+            <button class="close-modal" onclick="closeVarianceModal()">&times;</button>
+        </div>
+        
+        <div class="_tableWrapper" style="max-height: 60vh; overflow-y: auto;">
+            <table id="varianceFullTable">
+                <thead>
+                    <tr>
+                        <th class="sortable" onclick="sortTable(this, 0, false)">المقرر</th>
+                        <th class="sortable" onclick="sortTable(this, 1, false)" id="var-th-high">المدرب (الأعلى غياباً)</th>
+                        <th class="text-center sortable" onclick="sortTable(this, 2, true)">متوسط الغياب</th>
+                        <th class="sortable" onclick="sortTable(this, 3, false)" id="var-th-low">المدرب (الأقل غياباً)</th>
+                        <th class="text-center sortable" onclick="sortTable(this, 4, true)">متوسط الغياب</th>
+                        <th class="text-center sortable" onclick="sortTable(this, 5, true)">الفارق (التباين)</th>
+                    </tr>
+                </thead>
+                <tbody id="varianceModalBody">
+                    <!-- سيتم التعبئة بواسطة الجافاسكريبت -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+    
+    <!-- Modal مقارنة الفصول -->
+<div id="comparisonModal" class="modal-overlay">
+    <div class="modal-content wide" style="max-width: 900px;">
+        <div class="modal-header">
+            <h3 style="display: flex; align-items: center; gap: 10px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                مقارنة الأداء بين الفصول التدريبية
+            </h3>
+            <button class="close-modal" onclick="closeComparisonModal()">&times;</button>
+        </div>
+        
+        <div style="display: flex; gap: 20px; align-items: center; background: var(--bg-inset); padding: 15px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-bottom: 20px;">
+            <div style="flex: 1;">
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">الفصل الأساسي</label>
+                <select id="compTerm1" class="input-select" style="width: 100%; font-size: 14px;" onchange="runComparison()"></select>
+            </div>
+            <div style="font-size: 20px; color: var(--text-muted); font-weight: bold;">VS</div>
+            <div style="flex: 1;">
+                <label style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 5px;">فصل المقارنة</label>
+                <select id="compTerm2" class="input-select" style="width: 100%; font-size: 14px;" onchange="runComparison()"></select>
+            </div>
+        </div>
+
+        <div id="compError" style="display: none; padding: 15px; background: var(--danger-subtle); color: var(--danger); border-radius: 8px; text-align: center; margin-bottom: 20px; font-weight: bold;">
+            نأمل اختيار فصلين مختلفين يحتويان على بيانات مكتملة للمقارنة.
+        </div>
+
+        <div id="compResults" style="display: none;">
+            <div class="comp-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                <!-- ستتم تعبئة البطاقات بواسطة الجافاسكربت -->
+            </div>
+            
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 15px; height: 300px;">
+                <canvas id="compChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+    
 <!-- الملف الشخصي للمتدرب -->
 <div id="traineeProfileModal" class="modal-overlay">
     <div class="modal-content wide">
@@ -663,15 +744,41 @@
         switchTab('report-dashboard', document.getElementById('nav-dashboard'));
     };
 
-    window.deleteCurrentTerm = async function() {
-        if(termsList.length <= 1) { alert("لا يمكن حذف الفصل الوحيد المتبقي!"); return; }
-        if(confirm(`سيتم حذف بيانات "${activeTermName}" نهائياً؟`)) {
+window.deleteCurrentTerm = async function() {
+        if(termsList.length <= 1) { 
+            if(confirm("تنبيه هام جداً: هذا هو الفصل الوحيد المتبقي!\n\nهل تريد 'تفريغ النظام بالكامل'؟ (سيتم مسح جميع البيانات، الإعدادات، والنماذج المحفوظة والبدء من الصفر).")) {
+                try {
+                    // 1. مسح التخزين المحلي (LocalStorage) بالكامل
+                    localStorage.clear();
+                    
+                    // 2. مسح قاعدة البيانات (IndexedDB) بالكامل
+                    let db = await openDB();
+                    let transaction = db.transaction(['store'], 'readwrite');
+                    let store = transaction.objectStore('store');
+                    let clearRequest = store.clear(); // تفريغ كل السجلات
+                    
+                    clearRequest.onsuccess = function() {
+                        location.reload(); // إعادة تحميل الصفحة لتنظيف الذاكرة العشوائية
+                    };
+                    
+                    clearRequest.onerror = function() {
+                        alert("حدث خطأ أثناء مسح قاعدة البيانات.");
+                    };
+                } catch(e) {
+                    console.error("Error during factory reset:", e);
+                }
+            }
+            return; 
+        }
+
+        if(confirm(`سيتم حذف بيانات الفصل "${activeTermName}" نهائياً؟`)) {
             try {
                 let db = await openDB();
                 let transaction = db.transaction(['store'], 'readwrite');
                 transaction.objectStore('store').delete('term_' + activeTermName);
             } catch(e){}
             
+            // إزالة الفصل من القائمة وتحديث الواجهة
             termsList = termsList.filter(t => t !== activeTermName);
             activeTermName = termsList[0];
             renderTermDropdown();
@@ -1436,7 +1543,7 @@
             }
         });
         let topVariances = varianceStats.sort((a, b) => b.variance - a.variance).slice(0, 5);
-        
+        window.fullVarianceStats = varianceStats;
         let courseDetailedStats = {}; let instructorDetailedStats = {};
         processedData.sections.forEach(s => {
             if(!courseDetailedStats[s.name]) courseDetailedStats[s.name] = { enrolled:0, deprived:0, sumAbsPct:0 };
@@ -1462,8 +1569,16 @@
             <div class="admin-card"><h4>أكثر ${txt.instructors} إلغاءً للجلسات</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">محاضرات ملغاة</th></tr></thead><tbody>${topCanceledInst.map(i => `<tr><td>${i[0]}</td><td class="text-center mono" style="color:var(--info);">${i[1]}</td></tr>`).join('')}</tbody></table></div>
             <div class="admin-card"><h4>أكثر ${txt.instructors} تسجيلاً لرفع الحرمان</h4><table><thead><tr><th>${txt.instructor}</th><th class="text-center">رفع حرمان</th></tr></thead><tbody>${topLiftedInst.length > 0 ? topLiftedInst.map(i => `<tr><td>${i.name}</td><td class="text-center mono" style="color:#ea580c; font-weight:bold;">${i.liftedCount}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا يوجد</td></tr>'}</tbody></table></div>
             <div class="admin-card"><h4>ذروة الغياب (حسب وقت المحاضرة)</h4><table><thead><tr><th>فترة المحاضرة</th><th class="text-center">ساعات الغياب</th></tr></thead><tbody>${topTimeSlots.length > 0 ? topTimeSlots.map(t => `<tr><td dir="ltr" class="text-right mono" style="font-weight:bold;">${t[0]}</td><td class="text-center mono" style="color:var(--danger);">${t[1].toFixed(0)}</td></tr>`).join('') : '<tr><td colspan="2" class="text-center">لا توجد بيانات</td></tr>'}</tbody></table></div>
-            <div class="admin-card" style="grid-column: 1 / -1;"><h4 style="color: var(--primary);">التباين بين ${txt.instructors} في نفس المقرر (مؤشر توحيد المعايير)</h4><div class="_tableWrapper" style="max-height: none;">
-                    <table>
+            <div class="admin-card" style="grid-column: 1 / -1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h4 style="color: var(--primary); margin: 0; cursor: pointer; transition: color 0.2s; display: flex; align-items: center; gap: 8px;" onclick="openVarianceModal()" onmouseover="this.style.color='var(--primary-hover)'" onmouseout="this.style.color='var(--primary)'">
+            التباين بين ${txt.instructors} في نفس المقرر (مؤشر توحيد المعايير)
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+        </h4>
+            <button class="btn-action" style="font-size: 11.5px; border-color: var(--primary-border); color: var(--primary);" onclick="openVarianceModal()">عرض جميع المقررات (${varianceStats.length})</button>
+    </div>
+            <div class="_tableWrapper" style="max-height: none;">
+    <table>
                         <thead>
                             <tr>
                                 <th>المقرر</th>
@@ -1678,6 +1793,201 @@ Object.values(t.crns).forEach(c => {
         } else switchTab('upload', document.getElementById('nav-upload'));
     });
 
+    let compChartInstance = null;
+
+    window.openVarianceModal = function() {
+    let tbody = document.getElementById('varianceModalBody');
+    tbody.innerHTML = '';
+
+    // تحديث العناوين بناءً على التأنيث
+    document.getElementById('var-th-high').innerText = isFemale ? "المدربة (الأعلى غياباً)" : "المدرب (الأعلى غياباً)";
+    document.getElementById('var-th-low').innerText = isFemale ? "المدربة (الأقل غياباً)" : "المدرب (الأقل غياباً)";
+
+    if (!window.fullVarianceStats || window.fullVarianceStats.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:20px;">لا توجد بيانات متاحة للمقارنة حالياً.</td></tr>';
+    } else {
+        // ترتيب تنازلي افتراضياً حسب الفارق
+        let sortedData = window.fullVarianceStats.sort((a, b) => b.variance - a.variance);
+
+        sortedData.forEach(v => {
+            let badgeClass = v.variance >= 10 ? 'badge-danger' : (v.variance >= 5 ? 'badge-warning' : 'badge-success');
+            tbody.innerHTML += `
+            <tr>
+                <td style="font-weight:bold;">${v.course}</td>
+                <td class="name-cell">${v.highInst}</td>
+                <td class="text-center mono" style="color:var(--danger); font-weight:bold;">${v.highPct.toFixed(1)}%</td>
+                <td class="name-cell">${v.lowInst}</td>
+                <td class="text-center mono" style="color:var(--success); font-weight:bold;">${v.lowPct.toFixed(1)}%</td>
+                <td class="text-center mono"><span class="badge ${badgeClass}">${v.variance.toFixed(1)}%</span></td>
+            </tr>`;
+        });
+    }
+    
+    document.getElementById('varianceModal').classList.add('active');
+};
+
+window.closeVarianceModal = function() {
+    document.getElementById('varianceModal').classList.remove('active');
+};
+    
+window.openComparisonModal = function() {
+    if (termsList.length < 2) {
+        alert("أنت بحاجة إلى فصلين تدريبيين على الأقل لإجراء المقارنة. نأمل إضافة فصل جديد ورفع بياناته أولاً.");
+        return;
+    }
+    
+    let sel1 = document.getElementById('compTerm1');
+    let sel2 = document.getElementById('compTerm2');
+    sel1.innerHTML = ''; sel2.innerHTML = '';
+    
+    termsList.forEach(t => {
+        sel1.innerHTML += `<option value="${t}">${t}</option>`;
+        sel2.innerHTML += `<option value="${t}">${t}</option>`;
+    });
+
+    // اختيار أول وثاني فصل افتراضياً
+    if(termsList.length >= 2) {
+        sel1.value = termsList[1]; // القديم
+        sel2.value = termsList[0]; // الحديث (الحالي)
+    }
+
+    document.getElementById('comparisonModal').classList.add('active');
+    runComparison();
+};
+
+window.closeComparisonModal = function() {
+    document.getElementById('comparisonModal').classList.remove('active');
+};
+
+// دالة مبسطة لاستخراج الإحصائيات من البيانات الخام دون التأثير على النظام الحالي
+function extractTermStats(rawData) {
+    if (!rawData || !rawData.sf01 || !rawData.so04) return null;
+    
+    let stats = { activeTrainees: 0, deprivedCourses: 0, unexcusedHours: 0, canceledHours: 0 };
+    let uniqueTrainees = new Set();
+    
+    // تحليل SF01
+    rawData.sf01.forEach(row => {
+        let id = row['رقم المتدرب'] || row['رقم المتدربة'];
+        let status = row['حالة تسجيل'] || '';
+        let grade = row['الدرجة'] ? row['الدرجة'].toString().trim() : '';
+        
+        if (id && !status.includes('انسحاب') && !status.includes('مطوي')) {
+            uniqueTrainees.add(id);
+            if (grade === 'ح' || status.includes('حرمان')) {
+                stats.deprivedCourses++;
+            }
+        }
+    });
+    stats.activeTrainees = uniqueTrainees.size;
+
+    // تحليل SO04
+    rawData.so04.forEach(row => {
+        let absHours = parseFloat(row['ساعات الغياب']) || 0;
+        let excuse = row['نوع العذر'] || '';
+        if (absHours > 0) {
+            if (excuse.includes('بدون عذر')) stats.unexcusedHours += absHours;
+            else if (excuse.includes('جلسة ملغاة')) stats.canceledHours += absHours;
+        }
+    });
+
+    return stats;
+}
+
+window.runComparison = async function() {
+    let t1Name = document.getElementById('compTerm1').value;
+    let t2Name = document.getElementById('compTerm2').value;
+    
+    let db1 = await loadFromDB('term_' + t1Name);
+    let db2 = await loadFromDB('term_' + t2Name);
+
+    let stats1 = db1 ? extractTermStats(db1.data) : null;
+    let stats2 = db2 ? extractTermStats(db2.data) : null;
+
+    if (!stats1 || !stats2 || t1Name === t2Name) {
+        document.getElementById('compError').style.display = 'block';
+        document.getElementById('compResults').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('compError').style.display = 'none';
+    document.getElementById('compResults').style.display = 'block';
+
+    let traineeLabel = isFemale ? "المتدربات المستمرات" : "المتدربون المستمرون";
+    let metrics = [
+        { label: traineeLabel, v1: stats1.activeTrainees, v2: stats2.activeTrainees, inverse: false },
+        { label: "حالات الحرمان (مقرر)", v1: stats1.deprivedCourses, v2: stats2.deprivedCourses, inverse: true },
+        { label: "ساعات الغياب (بدون عذر)", v1: stats1.unexcusedHours, v2: stats2.unexcusedHours, inverse: true },
+        { label: "ساعات الجلسات الملغاة", v1: stats1.canceledHours, v2: stats2.canceledHours, inverse: true }
+    ];
+
+    let gridHtml = '';
+    let chartData1 = [];
+    let chartData2 = [];
+    let chartLabels = [];
+
+    metrics.forEach(m => {
+        let diff = m.v2 - m.v1;
+        let pct = m.v1 === 0 ? (diff > 0 ? 100 : 0) : (diff / m.v1) * 100;
+        
+        let varianceClass = 'variance-neutral';
+        let arrow = '';
+        if (diff > 0) {
+            varianceClass = m.inverse ? 'variance-bad' : 'variance-good';
+            arrow = '▲';
+        } else if (diff < 0) {
+            varianceClass = m.inverse ? 'variance-good' : 'variance-bad';
+            arrow = '▼';
+        }
+
+        let pctText = diff === 0 ? 'دون تغيير' : `${arrow} ${Math.abs(pct).toFixed(1)}%`;
+
+        gridHtml += `
+        <div class="comp-card">
+            <h4>${m.label}</h4>
+            <div class="comp-values">
+                <div class="comp-val-box"><span class="comp-val">${m.v1.toFixed(0)}</span><span class="comp-label">${t1Name}</span></div>
+                <div class="comp-val-box"><span class="comp-val">${m.v2.toFixed(0)}</span><span class="comp-label">${t2Name}</span></div>
+            </div>
+            <div class="comp-variance ${varianceClass}">${pctText}</div>
+        </div>`;
+
+        chartLabels.push(m.label);
+        chartData1.push(m.v1);
+        chartData2.push(m.v2);
+    });
+
+    document.querySelector('.comp-grid').innerHTML = gridHtml;
+
+    // تحديث الرسم البياني
+    if (compChartInstance) compChartInstance.destroy();
+    
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#9fb0b5' : '#475569';
+
+    compChartInstance = new Chart(document.getElementById('compChart'), {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: [
+                { label: t1Name, data: chartData1, backgroundColor: '#64748b', borderRadius: 4 },
+                { label: t2Name, data: chartData2, backgroundColor: '#34c2b4', borderRadius: 4 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, ticks: { color: textColor } },
+                x: { ticks: { color: textColor, font: { family: 'Cairo' } }, grid: { display: false } }
+            },
+            plugins: {
+                legend: { labels: { color: textColor, font: { family: 'Cairo' } } }
+            }
+        }
+    });
+};
+
     window.exportBackup = async function() {
         try {
             let backupData = {
@@ -1753,7 +2063,6 @@ Object.values(t.crns).forEach(c => {
                             if(i < keys.length) {
                                 store.put(backup.indexedDB[keys[i]], keys[i]).onsuccess = () => putNext(i + 1);
                             } else {
-                                alert("تم استيراد النظام بنجاح! سيتم تحديث الصفحة الآن.");
                                 location.reload(); // إعادة تحميل لتطبيق البيانات الجديدة
                             }
                         };
@@ -1761,7 +2070,7 @@ Object.values(t.crns).forEach(c => {
                     };
                 }
             } catch(error) {
-                alert("تعذر قراءة الملف! يرجى التأكد أنه ملف (JSON) صحيح.");
+                alert("تعذر قراءة الملف! يرجى التأكد أنه ملف صحيح.");
                 console.error(error);
             }
         };
