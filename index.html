@@ -1333,8 +1333,8 @@ let htmlSec = `<table><thead><tr>
                 <td class="mono text-center" style="width: 80px; min-width: 80px;">${s.crn}</td>
                 <td class="mono">${s.code}</td>
                 <td>${s.name}</td>
-                <td class="mono text-center">${s.instId || '-'}</td>
                 <td>${s.instName}</td>
+                <td class="mono text-center">${s.instId || '-'}</td>
                 <td class="text-center mono">${s.enrolled}</td>
                 <td class="text-center mono"><span class="badge ${s.deprived > 0 ? 'badge-danger' : 'badge-success'}">${s.deprived}</span></td>
                 <td class="text-center mono" style="color:var(--danger); font-weight:bold;">${s.avgPct.toFixed(1)}%</td>
