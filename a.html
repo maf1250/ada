@@ -330,6 +330,19 @@
         <div class="_header">
             <h3 id="pageTitle" style="margin: 0;">رفع التقارير</h3>
             <div class="gap-2">
+
+                </div>
+        
+        <!-- نظام الفصول التدريبية -->
+        <div style="padding: 10px 15px; border-bottom: 1px solid var(--border); background: var(--bg-surface);">
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">الفصل التدريبي الفعال:</div>
+            <select id="termSelector" class="input-select" style="width: 100%; margin-bottom: 8px; font-weight: bold; color: var(--primary);" onchange="switchTerm()"></select>
+            <div style="display: flex; gap: 5px;">
+                <button class="btn-action" style="flex: 1; padding: 4px; font-size: 11px; justify-content: center;" onclick="createNewTerm()">+</button>
+                <button class="btn-action" style="flex: 1; padding: 4px; font-size: 11px; justify-content: center; color: var(--danger); border-color: var(--danger-subtle);" onclick="deleteCurrentTerm()">x</button>
+            </div>
+        </div>
+                
                 <div class="search-box">
                     <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                     <input type="text" id="searchInput" class="input-text" placeholder="بحث بالاسم أو الرقم..." onkeyup="filterTables(); saveSettingsLocally();">
@@ -352,7 +365,7 @@
             </div>
         </div>
 
-            <div id="filtersBar" class="_filtersBar hidden">
+        <div id="filtersBar" class="_filtersBar hidden">
             <span style="font-weight: 700; color: var(--text-secondary); font-size: 13px;">تصفية سريعة:</span>
             <select id="filterMajor" class="input-select" onchange="filterTables(); saveSettingsLocally();">
                 <option value="">كل التخصصات</option>
@@ -363,13 +376,6 @@
             <select id="filterAbsence" class="input-select" onchange="filterTables(); saveSettingsLocally();">
                 <option value="">الجميع (غياب وانتظام)</option>
                 <option value="absent">التركيز على الغياب فقط</option>
-            </select>
-            <select id="filterInstructor" class="input-select" onchange="filterTables(); saveSettingsLocally();" style="border-color: var(--info);">
-                <option value="">كل المدربين</option>
-            </select>
-            <select id="filterWarning" class="input-select" onchange="filterTables(); saveSettingsLocally();" style="border-color: var(--warning);">
-                <option value="">حالة الإنذار (الجميع)</option>
-                <option value="warning">إنذار 15% فما فوق</option>
             </select>
         </div>
 
@@ -561,33 +567,115 @@
         } catch (e) { console.error("Error loading from IndexedDB:", e); return null; }
     }
 
+  var activeTermName = "الفصل الحالي";
+    var termsList = ["الفصل الحالي"];
     var rawData = { sf01: [], ss01: [], so04: [] };
     var fileDates = { sf01: null, ss01: null, so04: null };
     var processedData = { active: [], excluded: [], percentages: [], instructors: [], sections: [] };
-    var TTH = {};
-    var courseHours = {}; 
-    var isFemale = false; 
-    
-    // متغيرات جديدة للإحصائيات
+    var TTH = {}; var courseHours = {}; var isFemale = false; 
     var globalExcuseStats = { unexcused: 0, excused: 0, canceled: 0 };
-    var instructorCanceledCount = {};
-    var fullTraineeSessionDetails = {};
+    var instructorCanceledCount = {}; var fullTraineeSessionDetails = {};
 
     async function saveDataLocally() {
         try {
-            localStorage.setItem('abs_reports_dates', JSON.stringify(fileDates));
-            await saveToDB('rawData', rawData);
-        } catch (e) {}
+            // دمج البيانات مع التواريخ في حزمة واحدة لكل فصل
+            let termPackage = { data: rawData, dates: fileDates };
+            await saveToDB('term_' + activeTermName, termPackage);
+            localStorage.setItem('abs_terms_list', JSON.stringify(termsList));
+            localStorage.setItem('abs_active_term', activeTermName);
+        } catch (e) { console.error(e); }
     }
 
-function saveSettingsLocally() {
+    function renderTermDropdown() {
+        let sel = document.getElementById('termSelector');
+        sel.innerHTML = '';
+        termsList.forEach(t => {
+            sel.innerHTML += `<option value="${t}" ${t === activeTermName ? 'selected' : ''}>${t}</option>`;
+        });
+    }
+
+    window.createNewTerm = async function() {
+        let newName = prompt("نأمل إدخال اسم الفصل التدريبي الجديد للمقارنة (مثال: الفصل الثاني 1447):");
+        if(newName && newName.trim() !== "") {
+            newName = newName.trim();
+            if(termsList.includes(newName)) { alert("هذا الاسم موجود مسبقاً!"); return; }
+            
+            termsList.push(newName);
+            activeTermName = newName;
+            
+            // تصفير البيانات للفصل الجديد
+            rawData = { sf01: [], ss01: [], so04: [] };
+            fileDates = { sf01: null, ss01: null, so04: null };
+            
+            // تصفير واجهة الرفع
+            ['sf01', 'ss01', 'so04'].forEach(t => {
+                document.getElementById(`drop-${t}`).classList.remove('has-file');
+                let dateEl = document.getElementById(`date-${t}`); if(dateEl) dateEl.innerHTML = '';
+            });
+
+            await saveDataLocally();
+            renderTermDropdown();
+            processData(); // سيعيد تصفير الجداول وعرض أصفار
+            switchTab('upload', document.getElementById('nav-upload'));
+        }
+    };
+
+    window.switchTerm = async function() {
+        let selectedTerm = document.getElementById('termSelector').value;
+        activeTermName = selectedTerm;
+        localStorage.setItem('abs_active_term', activeTermName);
+        
+        let dbData = await loadFromDB('term_' + activeTermName);
+        if(dbData) {
+            rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
+            fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+        } else {
+            rawData = { sf01: [], ss01: [], so04: [] };
+            fileDates = { sf01: null, ss01: null, so04: null };
+        }
+
+        // تحديث واجهة الرفع
+        ['sf01', 'ss01', 'so04'].forEach(type => {
+            let dropz = document.getElementById(`drop-${type}`);
+            if(rawData[type] && rawData[type].length > 0) {
+                dropz.classList.add('has-file');
+                dropz.querySelector('p').innerText = "تم استرجاع الملف من الأرشيف";
+                if(fileDates[type]) renderFileDate(type, new Date(fileDates[type]));
+            } else {
+                dropz.classList.remove('has-file');
+                dropz.querySelector('p').innerText = type === 'sf01' ? "قائمة المتدربين" : (type === 'ss01' ? "جداول الوحدة" : "تقرير الغياب");
+                let dateEl = document.getElementById(`date-${type}`); if(dateEl) dateEl.innerHTML = '';
+            }
+        });
+
+        processData();
+        switchTab('report-dashboard', document.getElementById('nav-dashboard'));
+    };
+
+    window.deleteCurrentTerm = async function() {
+        if(termsList.length <= 1) { alert("لا يمكن حذف الفصل الوحيد المتبقي!"); return; }
+        if(confirm(`هل أنت متأكد من حذف بيانات "${activeTermName}" نهائياً؟`)) {
+            // مسح من IndexedDB (تجاوز حفظه)
+            try {
+                let db = await openDB();
+                let transaction = db.transaction(['store'], 'readwrite');
+                transaction.objectStore('store').delete('term_' + activeTermName);
+            } catch(e){}
+            
+            termsList = termsList.filter(t => t !== activeTermName);
+            activeTermName = termsList[0]; // العودة لأول فصل
+            await switchTerm();
+            renderTermDropdown();
+            await saveDataLocally(); // حفظ القائمة الجديدة
+        }
+    };
+
+    function saveSettingsLocally() {
         let settings = {
             weeks: document.getElementById('totalWeeks').value,
             major: document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : '',
             status: document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : '',
             absence: document.getElementById('filterAbsence') ? document.getElementById('filterAbsence').value : '',
-            instructor: document.getElementById('filterInstructor') ? document.getElementById('filterInstructor').value : '',
-            warning: document.getElementById('filterWarning') ? document.getElementById('filterWarning').value : '',
             search: document.getElementById('searchInput') ? document.getElementById('searchInput').value : ''
         };
         localStorage.setItem('abs_reports_settings', JSON.stringify(settings));
@@ -755,16 +843,13 @@ function saveSettingsLocally() {
         tbody.append(...rows);
     };
 
-  window.filterTables = function() {
+    window.filterTables = function() {
         let input = document.getElementById('searchInput'); let globalTextFilter = input.value.trim().toLowerCase();
         let majorFilter = document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : "";
         let statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : "";
         let absenceFilter = document.getElementById('filterAbsence') ? document.getElementById('filterAbsence').value : "";
-        let instFilter = document.getElementById('filterInstructor') ? document.getElementById('filterInstructor').value : "";
-        let warningFilter = document.getElementById('filterWarning') ? document.getElementById('filterWarning').value : "";
+        let tabs = ['dashboard-content', 'table-instructors', 'table-sections', 'table-main', 'table-matrix', 'table-percentages', 'table-threatened', 'table-fullweek', 'table-deprived-all', 'table-deprived-except', 'table-excluded'];
         
-        let tabs = ['dashboard-content', 'table-instructors', 'table-sections', 'table-main', 'table-matrix', 'table-percentages', 'table-threatened', 'table-fullweek', 'table-deprived-all', 'table-deprived-except', 'table-excluded', 'table-dropout', 'table-prep-gap'];
-      
         tabs.forEach(tabId => {
             let container = document.getElementById(tabId); if (!container) return;
             let table = container.querySelector('table');
@@ -780,20 +865,16 @@ function saveSettingsLocally() {
                     if (idTd && nameTd) matchGlobalText = (idVal.toLowerCase().indexOf(globalTextFilter) > -1 || nameVal.toLowerCase().indexOf(globalTextFilter) > -1);
                     else matchGlobalText = (tr.textContent || tr.innerText).toLowerCase().indexOf(globalTextFilter) > -1;
                     
-                   let rowMajor = tr.getAttribute('data-major') || "";
+                    let rowMajor = tr.getAttribute('data-major') || "";
                     let rowStatus = tr.getAttribute('data-status') || "";
                     let rowAbsent = tr.getAttribute('data-absent') === 'true';
-                    let rowInstructors = tr.getAttribute('data-instructors') || "";
-                    let rowWarning = tr.getAttribute('data-warning') === 'true';
                     
                     let matchMajor = majorFilter === "" || (tr.hasAttribute('data-major') ? rowMajor === majorFilter : true);
                     let matchStatus = statusFilter === "" || (tr.hasAttribute('data-status') ? rowStatus === statusFilter : true);
                     let matchAbsence = absenceFilter === "" || (absenceFilter === "absent" ? rowAbsent : true);
-                    let matchInst = instFilter === "" || (tr.hasAttribute('data-instructors') ? rowInstructors.includes(instFilter) : true);
-                    let matchWarning = warningFilter === "" || (warningFilter === "warning" ? rowWarning : true);
                     
-                    let show = matchGlobalText && matchMajor && matchStatus && matchAbsence && matchInst && matchWarning;
-                    
+                    let show = matchGlobalText && matchMajor && matchStatus && matchAbsence;
+
                     if (show && colFilters.length > 0) {
                         for (let i = 0; i < colFilters.length; i++) {
                             let filterVal = colFilters[i].value.trim().toLowerCase();
@@ -1014,12 +1095,6 @@ function saveSettingsLocally() {
         [...statusesSet].sort().forEach(s => statusSelect.innerHTML += `<option value="${s}">${s}</option>`);
         document.getElementById('filtersBar').classList.remove('hidden');
 
-        const instSelect = document.getElementById('filterInstructor');
-        instSelect.innerHTML = '<option value="">كل المدربين</option>';
-        processedData.instructors.forEach(inst => {
-            instSelect.innerHTML += `<option value="${inst.name}">${inst.name}</option>`;
-        });
-        
         let traineeSessionStatus = {}; fullTraineeSessionDetails = {};
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'] || row['رقم المتدربة']; let crn = row['الرقم المرجعي']; let weekNum = parseInt(row['رقم الأسبوع']);
@@ -1059,8 +1134,6 @@ function saveSettingsLocally() {
         processedData.active = []; processedData.excluded = []; processedData.percentages = [];
 
        Object.values(traineesMap).forEach(t => {
-            t.hasWarning = false;
-            t.instructorsSet = new Set();
             let isFullyExcluded = t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي') || t.courseCodes.size === 0;
             if(isFullyExcluded) { t.totalUniqueCourses = t.courseCodes.size; processedData.excluded.push(t); return; }
            
@@ -1072,8 +1145,6 @@ function saveSettingsLocally() {
                 if (crnData.isLifted) crnData.isOfficiallyDeprived = false;
                 
                 if (crnData.isOfficiallyDeprived) t.deprivedCourseCodes.add(crnData.code);
-                if (crnData.absPercentage >= 15) t.hasWarning = true;
-                if (crnMap[crn] && crnMap[crn].instName) t.instructorsSet.add(crnMap[crn].instName);
                 crnData.absPercentage = totalCrnHours > 0 ? (crnData.absHours / totalCrnHours) * 100 : 0;
                 
                 if(crnMap[crn]) crnMap[crn].totalAbsPct += crnData.absPercentage;
@@ -1083,7 +1154,6 @@ function saveSettingsLocally() {
                 }
             });
 
-           t.instructorStr = Array.from(t.instructorsSet).join('|');
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
@@ -1370,10 +1440,8 @@ function saveSettingsLocally() {
     const createRow = (t, isExcluded = false) => {
         let totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18; let hasAbsence = t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0;
         let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
-        let instStr = t.instructorStr ? t.instructorStr.replace(/"/g, '&quot;') : '';
-        let hasWarning = t.hasWarning === true;
-        let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}" data-instructors="${instStr}" data-warning="${hasWarning}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
-                if(!isExcluded) {
+        let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
+        if(!isExcluded) {
             html += `<td class="text-center">${t.totalUniqueCourses || 0}</td><td class="text-center"><span class="badge ${t.totalDeprivedCourses > 0 ? 'badge-danger' : 'badge-success'}">${t.totalDeprivedCourses || 0}</span></td><td class="text-center">${t.weeksAbsentCount > 0 ? `<span class="badge badge-warning">${t.weeksAbsentCount}</span>` : '<span style="color:var(--text-muted); font-weight:bold;">-</span>'}</td>`;
             for(let w=1; w<=totalWeeks; w++) { let st = t.weekStatuses ? t.weekStatuses[w] : null; let badge = ''; if(st === 'كامل') badge = '<span class="badge badge-danger">كامل</span>'; else if(st === 'محتمل') badge = '<span class="badge badge-info">محتمل</span>'; else if(st === 'جزئي') badge = '<span class="badge badge-warning">جزئي</span>'; else badge = '<span style="color:var(--text-muted); font-weight:bold;">-</span>'; html += `<td class="text-center">${badge}</td>`; }
         } else { html += `<td>${t.regStatus || '-'}</td><td>${t.traineeStatus || '-'}</td>`; }
@@ -1419,9 +1487,8 @@ let htmlSec = `<table><thead><tr>
         let htmlMatrix = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th><th class="nowrap sortable" style="min-width: 180px;" onclick="sortTable(this, 2, false)">التخصص</th><th>المقررات المسجلة ونسبة غياب كل مقرر</th></tr>${createFilterRow(4)}</thead><tbody>`;
         processedData.active.forEach(t => {
             let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
-            let instStr = t.instructorStr ? t.instructorStr.replace(/"/g, '&quot;') : '';
-            htmlMatrix += `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0}" data-instructors="${instStr}" data-warning="${t.hasWarning === true}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td><td><div class="course-card-wrapper">`;
-            Object.values(t.crns).forEach(c => { 
+            htmlMatrix += `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td><td><div class="course-card-wrapper">`;
+Object.values(t.crns).forEach(c => { 
             let cardClass = 'c-success'; 
             let pctText = c.absPercentage.toFixed(1) + '%'; 
             let customStyle = '';
@@ -1460,10 +1527,8 @@ let htmlSec = `<table><thead><tr>
             let msg = currentWaTemplate.replace(/{name}/g, p.traineeName).replace(/{course}/g, p.courseName).replace(/{pct}/g, p.absPercentage.toFixed(1));
             let waUrl = `https://api.whatsapp.com/send?phone=${window.formatPhone(p.phone)}&text=${encodeURIComponent(msg)}`;
             let statusBadge = p.isLifted ? '<span class="badge" style="background:rgba(234, 88, 12, 0.15); color:#ea580c; border:1px solid #ea580c;">رفع حرمان</span>' : (p.isDeprived ? `<span class="badge badge-danger">${isFemale?'محرومة (ح)':'محروم (ح)'}</span>` : (p.absPercentage > 20 ? '<span class="badge badge-danger" style="background:#ea580c26; color:#ea580c; border-color:#ea580c;">تجاوز 20%</span>' : (p.absPercentage >= 15 ? '<span class="badge badge-warning">إنذار</span>' : '<span class="badge badge-success">طبيعي</span>')));
-let instName = (crnMap[p.crn] && crnMap[p.crn].instName) ? crnMap[p.crn].instName : '';
-            let isWarn = p.absPercentage >= 15;
-            let rowHtml = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="true" data-instructors="${instName}" data-warning="${isWarn}"><td class="text-center"><input type="checkbox" class="wa-checkbox" data-url="${waUrl}"></td><td class="mono">${p.traineeId}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${p.traineeId}'); return false;">${p.traineeName}</a></td><td class="mono">${p.courseCode}</td><td>${p.courseName}</td><td class="mono">${p.crn}</td><td class="mono text-center" style="color: ${p.absPercentage >= 15 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: bold;">${p.absPercentage.toFixed(1)}%</td><td class="text-center">${statusBadge}</td><td class="text-center nowrap"><a href="${waUrl}" target="_blank" class="btn-whatsapp">إرسال واتساب</a></td></tr>`;
-             htmlPerc += rowHtml;
+            let rowHtml = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="true"><td class="mono">${p.traineeId}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${p.traineeId}'); return false;">${p.traineeName}</a></td><td class="mono">${p.courseCode}</td><td>${p.courseName}</td><td class="mono">${p.crn}</td><td class="mono text-center" style="color: ${p.absPercentage >= 15 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: bold;">${p.absPercentage.toFixed(1)}%</td><td class="text-center">${statusBadge}</td><td class="text-center nowrap"><a href="${waUrl}" target="_blank" class="btn-whatsapp"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg> إرسال واتساب</a></td></tr>`;
+            htmlPerc += rowHtml;
             if (p.absPercentage >= 18 && p.absPercentage <= 20) {
                 let tb = '<span class="badge badge-warning" style="background:#facc1533; color:#ca8a04; border-color:#facc15;">على وشك الحرمان</span>';
                 htmlThreatened += rowHtml.replace(statusBadge, tb);
@@ -1472,12 +1537,8 @@ let instName = (crnMap[p.crn] && crnMap[p.crn].instName) ? crnMap[p.crn].instNam
         htmlPerc += `</tbody></table>`; document.getElementById('table-percentages').innerHTML = htmlPerc;
         htmlThreatened += `</tbody></table>`; document.getElementById('table-threatened').innerHTML = htmlThreatened;
 
-       if (window.savedFilters) {
-            ['filterMajor', 'filterStatus', 'filterAbsence', 'filterInstructor', 'filterWarning', 'searchInput'].forEach(id => { 
-                if(document.getElementById(id) && window.savedFilters[id.replace('filter','').toLowerCase()]) {
-                    document.getElementById(id).value = window.savedFilters[id.replace('filter','').toLowerCase()];
-                } 
-            });
+        if (window.savedFilters) {
+            ['filterMajor', 'filterStatus', 'filterAbsence', 'searchInput'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = window.savedFilters[id.replace('filter','').toLowerCase()] || ''; });
         }
         window.filterTables();
     };
@@ -1493,12 +1554,44 @@ let instName = (crnMap[p.crn] && crnMap[p.crn].instName) ? crnMap[p.crn].instNam
     window.addEventListener('DOMContentLoaded', async () => {
         let settings = JSON.parse(localStorage.getItem('abs_reports_settings'));
         if (settings) { document.getElementById('totalWeeks').value = settings.weeks || 18; window.savedFilters = settings; }
-        let storedDates = localStorage.getItem('abs_reports_dates'); let dbData = await loadFromDB('rawData');
+        
+        // استعادة قائمة الفصول
+        let storedTerms = localStorage.getItem('abs_terms_list');
+        if(storedTerms) termsList = JSON.parse(storedTerms);
+        let storedActive = localStorage.getItem('abs_active_term');
+        if(storedActive && termsList.includes(storedActive)) activeTermName = storedActive;
+        else activeTermName = termsList[0];
+        
+        renderTermDropdown();
+
+        // تحميل بيانات الفصل الفعال
+        let dbData = await loadFromDB('term_' + activeTermName);
+        
+        // --- توافق رجعي (في حال كان لديه بيانات قديمة محفوظة بالنظام القديم) ---
+        if(!dbData) {
+            let oldData = await loadFromDB('rawData');
+            if(oldData) {
+                dbData = { data: oldData, dates: JSON.parse(localStorage.getItem('abs_reports_dates') || '{}') };
+                await saveToDB('term_' + activeTermName, dbData); // نقلها للنظام الجديد
+            }
+        }
+
         if (dbData) {
             try {
-                rawData = dbData;
-                if (storedDates) { fileDates = JSON.parse(storedDates); Object.keys(fileDates).forEach(type => { if (fileDates[type]) { renderFileDate(type, new Date(fileDates[type])); let dropz = document.getElementById(`drop-${type}`); if(dropz) { dropz.classList.add('has-file'); dropz.querySelector('p').innerText = "تم استرجاع الملف من التخزين"; } } }); }
-                if (rawData.sf01?.length > 0 && rawData.ss01?.length > 0 && rawData.so04?.length > 0) { processData(); switchTab('report-dashboard', document.getElementById('nav-dashboard')); } else switchTab('upload', document.getElementById('nav-upload'));
+                rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
+                fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+                
+                Object.keys(fileDates).forEach(type => { 
+                    if (fileDates[type] && rawData[type] && rawData[type].length > 0) { 
+                        renderFileDate(type, new Date(fileDates[type])); 
+                        let dropz = document.getElementById(`drop-${type}`); 
+                        if(dropz) { dropz.classList.add('has-file'); dropz.querySelector('p').innerText = "تم استرجاع الملف من التخزين"; } 
+                    } 
+                });
+                
+                if (rawData.sf01?.length > 0 && rawData.ss01?.length > 0 && rawData.so04?.length > 0) { 
+                    processData(); switchTab('report-dashboard', document.getElementById('nav-dashboard')); 
+                } else switchTab('upload', document.getElementById('nav-upload'));
             } catch(e) { switchTab('upload', document.getElementById('nav-upload')); }
         } else switchTab('upload', document.getElementById('nav-upload'));
     });
