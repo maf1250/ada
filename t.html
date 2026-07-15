@@ -855,7 +855,7 @@
         let majorFilter = document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : "";
         let statusFilter = document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : "";
         let absenceFilter = document.getElementById('filterAbsence') ? document.getElementById('filterAbsence').value : "";
-        let tabs = ['dashboard-content', 'table-instructors', 'table-sections', 'table-main', 'table-matrix', 'table-percentages', 'table-threatened', 'table-fullweek', 'table-deprived-all', 'table-deprived-except', 'table-excluded'];
+        let tabs = ['dashboard-content', 'table-instructors', 'table-sections', 'table-main', 'table-matrix', 'table-percentages', 'table-threatened', 'table-fullweek', 'table-deprived-all', 'table-deprived-except', 'table-excluded', 'table-dropout', 'table-prep-gap'];
         
         tabs.forEach(tabId => {
             let container = document.getElementById(tabId); if (!container) return;
@@ -1576,7 +1576,12 @@ Object.values(t.crns).forEach(c => {
         });
         htmlPerc += `</tbody></table>`; document.getElementById('table-percentages').innerHTML = htmlPerc;
         htmlThreatened += `</tbody></table>`; document.getElementById('table-threatened').innerHTML = htmlThreatened;
-// رسم جدول خطر الانقطاع المفاجئ
+
+        // استخراج رقم الأسبوع الحالي لطباعته في الجداول
+        let currentWeek = Math.max(...Object.keys(TTH || {1:1}).map(Number));
+        if(!isFinite(currentWeek) || currentWeek < 1) currentWeek = 1;
+
+        // رسم جدول خطر الانقطاع المفاجئ
         let htmlDropout = `<table><thead><tr><th class="nowrap sortable" onclick="sortTable(this, 0, false)">${colId}</th><th class="nowrap name-cell sortable" onclick="sortTable(this, 1, false)">${colName}</th><th class="nowrap sortable" onclick="sortTable(this, 2, false)">التخصص</th><th class="nowrap text-center sortable" onclick="sortTable(this, 3, false)">حالة الأسبوع السابق (${currentWeek-1})</th><th class="nowrap text-center sortable" onclick="sortTable(this, 4, false)">حالة الأسبوع الحالي (${currentWeek})</th><th class="nowrap text-center">تنبيه الإرشاد</th></tr>${createFilterRow(6, [5])}</thead><tbody>`;
         processedData.dropoutRisks.forEach(t => {
             htmlDropout += `<tr><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td><td class="text-center"><span class="badge ${t.weekStatuses[currentWeek-1] === '-' ? 'badge-success' : 'badge-warning'}">${t.weekStatuses[currentWeek-1] === '-' ? 'منتظم' : 'غياب جزئي'}</span></td><td class="text-center"><span class="badge badge-danger">انقطاع كامل</span></td><td class="text-center"><button class="btn-action" style="padding:4px 8px; font-size:10.5px; background:var(--bg-elevated);" onclick="openTraineeProfile('${t.id}')">استعراض الحالة</button></td></tr>`;
