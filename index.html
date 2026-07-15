@@ -305,7 +305,7 @@
             <span>غياب أسبوع كامل فأكثر</span><span class="tab-badge" id="badge-fullweek">0</span>
         </div>
         <div class="_navItem" id="nav-threatened" onclick="switchTab('report-threatened', this)">
-            <span id="label-threatened">المتدربون المهددون بالحرمان</span><span class="tab-badge" id="badge-threatened">0</span>
+            <span id="label-threatened">المتدربون على وشك الحرمان</span><span class="tab-badge" id="badge-threatened">0</span>
         </div>
         <div class="_navItem" onclick="switchTab('report-deprived-all', this)">
             <span>الحرمان بكل المقررات</span><span class="tab-badge" id="badge-deprived-all">0</span>
@@ -790,7 +790,7 @@
         document.getElementById('label-main').innerText = isFemale ? 'المتدربات' : 'المتدربون';
         document.getElementById('label-instructors').innerText = isFemale ? 'تقرير المدربات' : 'تقرير المدربون';  
         document.getElementById('label-excluded').innerText = isFemale ? 'المنسحبات والمطوي قيدهن' : 'المنسحبون والمطوي قيدهم';
-        document.getElementById('label-threatened').innerText = isFemale ? 'المتدربات المهددات بالحرمان' : 'المتدربون المهددون بالحرمان';
+        document.getElementById('label-threatened').innerText = isFemale ? 'المتدربات على وشك الحرمان' : 'المتدربون على وشك الحرمان';
         document.getElementById('legend-full').innerHTML = isFemale ? 'تعني أن المتدربة انقطعت وغابت غياباً تاماً وبنسبة 100% عن جميع مقرراتها المسجلة في ذلك الأسبوع.' : 'تعني أن المتدرب انقطع وغاب غياباً تاماً وبنسبة 100% عن جميع مقرراته المسجلة في ذلك الأسبوع.';
         document.getElementById('legend-partial').innerHTML = isFemale ? 'تعني أن المتدربة غابت عن بعض المقررات أو المحاضرات، ولكنها حضرت في مقررات أخرى خلال نفس الأسبوع.' : 'تعني أن المتدرب غاب عن بعض المقررات أو المحاضرات، ولكنه حضر في مقررات أخرى خلال نفس الأسبوع.';
         document.getElementById('legend-prob').innerHTML = isFemale ? 'تعني أنه لم يُسجل للمتدربة أي غياب، وفي نفس الوقت لم تقم أي مدربة بالتحضير في نظامها، لذا يحتمل حضورها أو غيابها.' : 'تعني أنه لم يُسجل للمتدرب أي غياب، وفي نفس الوقت لم يقم أي مدرب بالتحضير في نظامه، لذا يحتمل حضوره أو غيابها.';
@@ -957,8 +957,8 @@
             
             let crn = row['الرقم المرجعي']; let courseCode = row['المقرر']; let courseName = row['اسم المقرر'] || row['عنوان المقرر'];
             let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي'); 
-            let isDeprived = (grade === 'ح'); 
-            let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
+            let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
+            let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان') || regStatus.includes('مدير النظام');
 
             if(crn && courseCode && !isCourseExcluded) {
                 traineesMap[id].courseCodes.add(courseCode);
@@ -967,7 +967,10 @@
                     traineesMap[id].crns[crn] = { code: courseCode, name: courseName, hours: ch, absHours: 0, isOfficiallyDeprived: isDeprived, regStatus: regStatus, isLifted: isLifted };
                 } else {
                     if (isDeprived) traineesMap[id].crns[crn].isOfficiallyDeprived = true;
-                    if (isLifted) traineesMap[id].crns[crn].isLifted = true;
+                    if (isLifted) {
+                        traineesMap[id].crns[crn].isLifted = true;
+                        traineesMap[id].crns[crn].isOfficiallyDeprived = false; // إلغاء الحرمان فوراً إذا تم رفعه
+                    }
                     traineesMap[id].crns[crn].regStatus = regStatus; // تحديث بأحدث حالة
                 }
                 
@@ -1028,15 +1031,19 @@
             let isFullyExcluded = t.traineeStatus.includes('انسحاب') || t.traineeStatus.includes('مطوي') || t.courseCodes.size === 0;
             if(isFullyExcluded) { t.totalUniqueCourses = t.courseCodes.size; processedData.excluded.push(t); return; }
            
-            t.deprivedCourseCodes = new Set(); 
+           t.deprivedCourseCodes = new Set(); 
             Object.keys(t.crns).forEach(crn => {
                 let crnData = t.crns[crn]; let totalCrnHours = crnData.hours * totalWeeks;
+                
+                // التأكيد على إلغاء الحرمان إذا كان مرفوعاً
+                if (crnData.isLifted) crnData.isOfficiallyDeprived = false;
+                
                 if (crnData.isOfficiallyDeprived) t.deprivedCourseCodes.add(crnData.code);
                 crnData.absPercentage = totalCrnHours > 0 ? (crnData.absHours / totalCrnHours) * 100 : 0;
                 
                 if(crnMap[crn]) crnMap[crn].totalAbsPct += crnData.absPercentage;
 
-               if(crnData.absPercentage > 0) {
+                if(crnData.absPercentage > 0) {
                     processedData.percentages.push({ traineeName: t.name, traineeId: t.id, phone: t.phone, major: t.major, traineeStatus: t.traineeStatus, courseCode: crnData.code, courseName: crnData.name, crn: crn, absPercentage: crnData.absPercentage, isDeprived: crnData.isOfficiallyDeprived, isLifted: crnData.isLifted });
                 }
             });
@@ -1370,9 +1377,8 @@ Object.values(t.crns).forEach(c => {
             let pctText = c.absPercentage.toFixed(1) + '%'; 
             let customStyle = '';
             
-            // إضافة شرط رفع الحرمان هنا
             if (c.isLifted) { 
-                cardClass = ''; // إفراغ الكلاس الافتراضي
+                cardClass = ''; 
                 customStyle = 'border-color:#ea580c; background:rgba(234, 88, 12, 0.15); color:#ea580c;'; 
                 pctText = `رفع حرمان | ${c.absPercentage.toFixed(1)}%`; 
             } 
@@ -1385,7 +1391,7 @@ Object.values(t.crns).forEach(c => {
             
             htmlMatrix += `<div class="course-card ${cardClass}" style="${customStyle}"><span>${c.name} <span style="opacity:0.7; font-size:10px;">(${c.code})</span></span><span class="pct">${pctText}</span></div>`; 
         });
-                        htmlMatrix += `</div></td></tr>`;
+            htmlMatrix += `</div></td></tr>`;
         });
         htmlMatrix += `</tbody></table>`; document.getElementById('table-matrix').innerHTML = htmlMatrix;
 
