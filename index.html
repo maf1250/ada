@@ -388,12 +388,7 @@
         <div class="_header">
             <h3 id="pageTitle" style="margin: 0;">رفع التقارير</h3>
             <div class="gap-2">
-
-                  <div class="search-box">
-                    <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" id="searchInput" class="input-text" style="height: 36px;" placeholder="بحث بالاسم أو الرقم..." onkeyup="filterTables(); saveSettingsLocally();">
-                </div>
-                
+               
                 <!-- نظام الفصول التدريبية (النسخة الأفقية المدمجة) -->
                 <div style="display: flex; align-items: center; background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0 4px; height: 36px; box-sizing: border-box;">
                     <span style="font-size: 11.5px; font-weight: bold; color: var(--text-muted); margin: 0 8px;">الفصل:</span>
@@ -435,14 +430,18 @@
         </div>
 
        <div id="filtersBar" class="_filtersBar hidden">   
-            <span style="font-weight: 700; color: var(--text-secondary); font-size: 13px;">تصفية سريعة:</span>
+
+           <div class="search-box" style="margin-left: 0; margin-right: 10px;">
+                <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="searchInput" class="input-text" style="height: 36px;" placeholder="بحث بالاسم أو الرقم..." onkeyup="filterTables(); saveSettingsLocally();">
+            </div>
+
+            <span class="filter-label" style="font-weight: 700; color: var(--text-secondary); font-size: 13px; margin-right: 15px;">تصفية سريعة:</span>
             
-            <!-- الفلتر الجديد للمستجدين -->
             <select id="filterCohort" class="input-select" onchange="filterTables(); saveSettingsLocally();">
                 <option value="">الجميع (مستجدين ومستمرين)</option>
                 <option value="new">المستجدين فقط</option>
             </select>
-
             <select id="filterMajor" class="input-select" onchange="filterTables(); saveSettingsLocally();">
                 <option value="">كل التخصصات</option>
             </select>
@@ -854,7 +853,7 @@ function saveSettingsLocally() {
         localStorage.setItem('abs_reports_settings', JSON.stringify(settings));
     }
 
-   window.switchTab = function(tabId, el, titleOverride) {
+window.switchTab = function(tabId, el, titleOverride) {
         document.querySelectorAll('.tab-content').forEach(e => e.classList.add('hidden'));
         document.getElementById(tabId).classList.remove('hidden');
         
@@ -868,20 +867,26 @@ function saveSettingsLocally() {
             document.getElementById('pageTitle').innerText = titleOverride;
         }
 
-        // --- التحكم بظهور وإخفاء التصفية السريعة ---
+        // --- التحكم بظهور وإخفاء التصفية السريعة ومربع البحث ---
         let filtersBar = document.getElementById('filtersBar');
         if (filtersBar) {
-            // إخفاء الشريط في صفحة الرفع، لوحة الإحصائيات، المدربين، والشعب
-            if (['upload', 'report-dashboard', 'report-instructors', 'report-sections'].includes(tabId)) {
+            if (['upload', 'report-dashboard'].includes(tabId)) {
                 filtersBar.style.display = 'none';
             } else {
-                // إظهاره في باقي الصفحات (في حال وجود بيانات)
+                // إظهار الشريط في باقي الصفحات
                 if (processedData && processedData.active && processedData.active.length > 0) {
                     filtersBar.style.display = 'flex';
+                    
+                    // إخفاء القوائم المنسدلة فقط في صفحة المدربين والشعب (وترك البحث)
+                    let filterElements = filtersBar.querySelectorAll('select, span.filter-label');
+                    if (['report-instructors', 'report-sections'].includes(tabId)) {
+                        filterElements.forEach(el => el.style.display = 'none');
+                    } else {
+                        filterElements.forEach(el => el.style.display = '');
+                    }
                 }
             }
         }
-        // ------------------------------------------
         
         if(tabId === 'report-dashboard' && processedData.active.length > 0) {
             setTimeout(() => renderDashboard(), 50);
@@ -1292,9 +1297,40 @@ window.filterTables = function() {
 
         const majorSelect = document.getElementById('filterMajor'); majorSelect.innerHTML = '<option value="">كل التخصصات</option>';
         [...majorsSet].sort().forEach(m => majorSelect.innerHTML += `<option value="${m}">${m}</option>`);
-        const statusSelect = document.getElementById('filterStatus'); statusSelect.innerHTML = '<option value="">كل الحالات</option>';
+       const statusSelect = document.getElementById('filterStatus'); statusSelect.innerHTML = '<option value="">كل الحالات</option>';
         [...statusesSet].sort().forEach(s => statusSelect.innerHTML += `<option value="${s}">${s}</option>`);
-        document.getElementById('filtersBar').classList.remove('hidden');
+        
+        // --- خوارزمية تحديد دفعة المستجدين ---
+        let cohortsSet = new Set();
+        Object.keys(traineesMap).forEach(id => {
+            let idStr = String(id).trim();
+            if(idStr.length >= 4) { cohortsSet.add(parseInt(idStr.substring(0, 4))); }
+        });
+        window.highestCohort = cohortsSet.size > 0 ? Math.max(...Array.from(cohortsSet)) : 0;
+        let cohortSelect = document.getElementById('filterCohort');
+        if(cohortSelect && window.highestCohort > 0) {
+            cohortSelect.options[1].text = `المستجدين (دفعة ${window.highestCohort})`;
+        }
+        
+        // --- التحكم بظهور الشريط ومربع البحث بناءً على الصفحة المفتوحة ---
+        let activeTab = document.querySelector('.tab-content:not(.hidden)');
+        let filtersBar = document.getElementById('filtersBar');
+        if (filtersBar) {
+            filtersBar.classList.remove('hidden');
+            // إخفاء الشريط بالكامل فقط في صفحة الرفع ولوحة الإحصائيات
+            if (activeTab && ['upload', 'report-dashboard'].includes(activeTab.id)) {
+                filtersBar.style.display = 'none';
+            } else {
+                filtersBar.style.display = 'flex';
+                // إذا كنا في صفحة المدربين أو الشعب، نخفي الفلاتر ونترك مربع البحث فقط
+                let filterElements = filtersBar.querySelectorAll('select, span.filter-label');
+                if (activeTab && ['report-instructors', 'report-sections'].includes(activeTab.id)) {
+                    filterElements.forEach(el => el.style.display = 'none');
+                } else {
+                    filterElements.forEach(el => el.style.display = ''); // إظهارها في باقي الصفحات
+                }
+            }
+        }
 
         // التحكم بظهور الشريط بناءً على الصفحة المفتوحة وقت انتهاء المعالجة
         let activeTab = document.querySelector('.tab-content:not(.hidden)');
