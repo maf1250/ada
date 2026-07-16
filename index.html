@@ -433,14 +433,14 @@
 
            <div class="search-box" style="margin-left: 0; margin-right: 10px;">
                 <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="searchInput" class="input-text" style="height: 36px;" placeholder="بحث بالاسم أو الرقم..." onkeyup="filterTables(); saveSettingsLocally();">
+                <input type="text" id="searchInput" class="input-text" style="height: 36px;" placeholder="بحث..." onkeyup="filterTables(); saveSettingsLocally();">
             </div>
 
             <span class="filter-label" style="font-weight: 700; color: var(--text-secondary); font-size: 13px; margin-right: 15px;">تصفية سريعة:</span>
             
             <select id="filterCohort" class="input-select" onchange="filterTables(); saveSettingsLocally();">
-                <option value="">الجميع (مستجدين ومستمرين)</option>
-                <option value="new">المستجدين فقط</option>
+                <option value="">الجميع (مستجدون ومستمرون)</option>
+                <option value="new">المستجدون فقط</option>
             </select>
             <select id="filterMajor" class="input-select" onchange="filterTables(); saveSettingsLocally();">
                 <option value="">كل التخصصات</option>
@@ -1108,6 +1108,11 @@ window.filterTables = function() {
         document.getElementById('legend-present').innerHTML = isFemale ? 'تعني أن المتدربة حاضرة (تم تحضيرها في محاضرة واحدة على الأقل ولم يسجل لها أي غياب).' : 'تعني أن المتدرب حاضر (تم تحضيره في محاضرة واحدة على الأقل ولم يسجل له أي غياب).';
         document.getElementById('legend-deprived').innerHTML = isFemale ? 'تعني أن المتدربة تجاوزت الحد المسموح للغياب وتم رصد درجة الحرمان (ح) لها في تقرير SF01.' : 'تعني أن المتدرب تجاوز الحد المسموح للغياب وتم رصد درجة الحرمان (ح) له في تقرير SF01.';
         document.getElementById('legend-twenty').innerHTML = isFemale ? 'تعني أن نسبة غياب المتدربة في المقرر تجاوزت 20% (مؤهلة للحرمان إذا لم تُقبل أعذارها).' : 'تعني أن نسبة غياب المتدرب في المقرر تجاوز 20% (مؤهل للحرمان إذا لم يُقبل عذره).';
+        let cohortSelect = document.getElementById('filterCohort');
+    if (cohortSelect) {
+        cohortSelect.options[0].text = isFemale ? "الجميع (مستجدات ومستمرات)" : "الجميع (مستجدون ومستمرون)";
+        cohortSelect.options[1].text = isFemale ? "المستجدات فقط" : "المستجدون فقط"; 
+    }
         if(document.getElementById('legend-lifted')) document.getElementById('legend-lifted').innerHTML = isFemale ? 'تعني أنه رصد حرمان للمتدربة مسبقاً، وتم عمل استثناء لها وإعادة قيدها في المقرر (مقرر معاد قيده لتعديل الحرمان).' : 'تعني أنه رصد حرمان للمتدرب مسبقاً، وتم عمل استثناء له وإعادة قيده في المقرر (مقرر معاد قيده لتعديل الحرمان).';
         
         let activeTab = document.querySelector('._navItem.active');
@@ -1307,9 +1312,11 @@ window.filterTables = function() {
             if(idStr.length >= 4) { cohortsSet.add(parseInt(idStr.substring(0, 4))); }
         });
         window.highestCohort = cohortsSet.size > 0 ? Math.max(...Array.from(cohortsSet)) : 0;
-        let cohortSelect = document.getElementById('filterCohort');
+      let cohortSelect = document.getElementById('filterCohort');
         if(cohortSelect && window.highestCohort > 0) {
-            cohortSelect.options[1].text = `المستجدين (دفعة ${window.highestCohort})`;
+            cohortSelect.options[1].text = isFemale 
+                ? `المستجدات (دفعة ${window.highestCohort})` 
+                : `المستجدين (دفعة ${window.highestCohort})`;
         }
         
         // --- التحكم بظهور الشريط ومربع البحث بناءً على الصفحة المفتوحة ---
