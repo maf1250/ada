@@ -1322,38 +1322,63 @@ window.deleteCurrentTerm = async function() {
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
-      for(let w=1; w<=totalWeeks; w++) {
-                let absentCrnsCount = 0; let fullyAbsentCrnsCount = 0; let expectedCrnsCount = 0; let anyTrainerTaught = false; let anyCanceled = false;
-                activeCrns.forEach(crn => {
-                    let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0; let scheduleHours = t.crns[crn].hours || 0;
-                    let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
-                    let unexcusedAbs = wData ? wData.unexcusedAbs : 0; let canceledAbs = wData ? wData.canceledAbs : 0;
-                    let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours; let expectedHours = Math.max(0, baseHours - canceledAbs);
+   for(let w=1; w<=totalWeeks; w++) {
+                let expectedCrnsCount = 0;
+                let absentCrnsCount = 0;
+                let presentCrnsCount = 0;
+                let unknownCrnsCount = 0;
 
-                    if (canceledAbs > 0) anyCanceled = true;
-                    if (expectedHours > 0 || taughtHours > 0) expectedCrnsCount++; if (taughtHours > 0) anyTrainerTaught = true;
-                    if (unexcusedAbs > 0) { absentCrnsCount++; if (expectedHours === 0 || unexcusedAbs >= expectedHours) fullyAbsentCrnsCount++; }
+                activeCrns.forEach(crn => {
+                    let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0;
+                    let scheduleHours = t.crns[crn].hours || 0;
+                    let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
+                    let unexcusedAbs = wData ? wData.unexcusedAbs : 0;
+                    let canceledAbs = wData ? wData.canceledAbs : 0;
+
+                    let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours;
+                    let expectedHours = Math.max(0, baseHours - canceledAbs);
+
+                    if (expectedHours > 0 || taughtHours > 0 || canceledAbs > 0) {
+                        expectedCrnsCount++;
+
+                        if (unexcusedAbs > 0) {
+                            absentCrnsCount++; // سجل غياب
+                        } else if (canceledAbs > 0) {
+                            unknownCrnsCount++; // مسجل كجلسة ملغاة (مجهول)
+                        } else if (taughtHours === 0 && expectedHours > 0) {
+                            unknownCrnsCount++; // لم يقم المدرب بالتحضير (مجهول)
+                        } else if (taughtHours > 0 && unexcusedAbs === 0) {
+                            presentCrnsCount++; // حاضر بشكل مؤكد
+                        }
+                    }
                 });
 
-                // الترتيب للأولويات
-                if (absentCrnsCount > 0) {
-                    // الأولوية الأولى: يوجد غياب صريح
-                    if (fullyAbsentCrnsCount > 0 && fullyAbsentCrnsCount === expectedCrnsCount) { t.weekStatuses[w] = "كامل"; t.weeksAbsentCount++; }
-                    else { t.weekStatuses[w] = "جزئي"; t.weeksAbsentCount++; }
-                } else if (anyTrainerTaught) {
-                    // الأولوية الثانية: حضر في مقرر واحد على الأقل (ولم يغب في البقية)
-                    t.weekStatuses[w] = "-"; 
-                } else if (anyCanceled) { 
-                    // الأولوية الثالثة: لم يغب، ولم يسجل له حضور، ولكن توجد جلسة ملغاة
-                    t.weekStatuses[w] = "محتمل"; 
-                } else if (expectedCrnsCount === 0) {
-                    // الأولوية الرابعة: أسبوع إجازة (لا توجد ساعات متوقعة)
-                    t.weekStatuses[w] = "-"; 
+                // شجرة اتخاذ القرار الدقيقة الجديدة بناءً على الفئات
+                if (expectedCrnsCount === 0) {
+                    t.weekStatuses[w] = "-"; // إجازة أو لا يوجد مقررات مجدولة
+                } else if (presentCrnsCount > 0 && absentCrnsCount > 0) {
+                    // حضر بعض المقررات وغاب في أخرى (مؤكد 100% أنه جزئي بغض النظر عن المقررات المجهولة)
+                    t.weekStatuses[w] = "جزئي";
+                    t.weeksAbsentCount++;
+                } else if (absentCrnsCount > 0 && unknownCrnsCount > 0) {
+                    // غاب في مقرر، والمقرر الآخر ملغى أو لم يُحضر (وهذا هو مثالك بالضبط)
+                    t.weekStatuses[w] = "محتمل";
+                    t.weeksAbsentCount++; // يُحسب له أسبوع غياب لأن لديه غياب فعلي مؤكد في النظام
+                } else if (absentCrnsCount > 0 && unknownCrnsCount === 0) {
+                    // غاب في جميع المقررات المجدولة بشكل مؤكد
+                    t.weekStatuses[w] = "كامل";
+                    t.weeksAbsentCount++;
+                } else if (absentCrnsCount === 0 && unknownCrnsCount > 0) {
+                    // لم يغب أبداً، ولكن توجد مقررات ملغاة أو لم تُحضر (لا نعلم هل حضرها أم لا)
+                    t.weekStatuses[w] = "محتمل";
+                } else if (absentCrnsCount === 0 && unknownCrnsCount === 0) {
+                    // حاضر في جميع المقررات بشكل مؤكد
+                    t.weekStatuses[w] = "-";
                 } else {
-                    // الأولوية الخامسة: فجوة تحضير (المدربون لم يحضروا ولم يتم الإلغاء)
-                    t.weekStatuses[w] = "محتمل"; 
+                    t.weekStatuses[w] = "محتمل"; // حالة احتياطية
                 }
             }
+           
            processedData.active.push(t);
         });
 
