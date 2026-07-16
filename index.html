@@ -1332,36 +1332,7 @@ window.filterTables = function() {
             }
         }
 
-        // التحكم بظهور الشريط بناءً على الصفحة المفتوحة وقت انتهاء المعالجة
-        let activeTab = document.querySelector('.tab-content:not(.hidden)');
-        let filtersBar = document.getElementById('filtersBar');
-        if (filtersBar) {
-            filtersBar.classList.remove('hidden');
-            if (activeTab && ['upload', 'report-dashboard', 'report-instructors', 'report-sections'].includes(activeTab.id)) {
-                filtersBar.style.display = 'none';
-            } else {
-                filtersBar.style.display = 'flex';
-            }
-        }
-        
-        // --- خوارزمية تحديد دفعة المستجدين ---
-        let cohortsSet = new Set();
-        Object.keys(traineesMap).forEach(id => {
-            let idStr = String(id).trim();
-            if(idStr.length >= 4) {
-                cohortsSet.add(parseInt(idStr.substring(0, 4))); // أخذ أول 4 أرقام
-            }
-        });
-        // تحديد أكبر دفعة (المستجدين)
-        window.highestCohort = cohortsSet.size > 0 ? Math.max(...Array.from(cohortsSet)) : 0;
-        
-        // تحديث نص الفلتر ليوضح للمستخدم رقم الدفعة المكتشفة تلقائياً
-        let cohortSelect = document.getElementById('filterCohort');
-        if(cohortSelect && window.highestCohort > 0) {
-            cohortSelect.options[1].text = `المستجدين (دفعة ${window.highestCohort})`;
-        }
-        // ----------------------------------------
-
+  
         let traineeSessionStatus = {}; fullTraineeSessionDetails = {};
         rawData.so04.forEach(row => {
             let id = row['رقم المتدرب'] || row['رقم المتدربة']; let crn = row['الرقم المرجعي']; let weekNum = parseInt(row['رقم الأسبوع']);
