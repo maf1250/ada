@@ -1433,80 +1433,76 @@ window.filterTables = function() {
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
-for(let w=1; w<=totalWeeks; w++) {
-                let expectedCrnsCount = 0;
-                let fullyAbsentCrnsCount = 0;
-                let partiallyAbsentCrnsCount = 0;
-                let presentCrnsCount = 0;
-                let unknownCrnsCount = 0;
+
+           for(let w=1; w<=totalWeeks; w++) {
+                let confirmedPresence = false; // هل أثبت تواجده في الكلية هذا الأسبوع؟
+                let confirmedFullAbsenceInAnyCrn = false; // هل غاب غياباً تاماً عن أي مقرر؟
+                let unknownCrnCount = 0; // عدد المقررات الملغاة أو التي لم تُحضر
+                let hasAnyAbs = false; // هل لديه أي ساعة غياب؟
+                let totalActiveCrns = 0;
 
                 activeCrns.forEach(crn => {
-                    let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0;
                     let scheduleHours = t.crns[crn].hours || 0;
+                    // TTH يجلب لنا هل المدرب قام بتحضير أي شخص في هذه الشعبة أم لا
+                    let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0; 
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
                     let unexcusedAbs = wData ? wData.unexcusedAbs : 0;
                     let canceledAbs = wData ? wData.canceledAbs : 0;
 
-                    // الساعات المتوقعة يجب أن تعتمد على الجدول الأساسي لمنع تجاهل اللقاءات غير المُحضرة
-                    let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours;
-                    let expectedHours = Math.max(0, baseHours - canceledAbs);
+                    if (scheduleHours > 0) {
+                        totalActiveCrns++;
+                        if (unexcusedAbs > 0) hasAnyAbs = true;
 
-                    if (expectedHours > 0 || taughtHours > 0 || canceledAbs > 0) {
-                        expectedCrnsCount++;
+                        let expectedHours = Math.max(0, scheduleHours - canceledAbs);
 
-                        if (unexcusedAbs > 0) {
-                            // التعديل الجوهري: الاعتماد على expectedHours وليس taughtHours
-                            if (expectedHours > 0 && unexcusedAbs >= expectedHours) {
-                                fullyAbsentCrnsCount++; // غاب عن جميع الساعات المجدولة للمقرر
+                        // إذا تم إلغاء المحاضرة، أو المدرب لم يقم بتحضير أي متدرب إطلاقاً (taughtHours = 0)
+                        if (expectedHours === 0 || (taughtHours === 0 && unexcusedAbs === 0)) {
+                            unknownCrnCount++;
+                            if (unexcusedAbs >= scheduleHours) confirmedFullAbsenceInAnyCrn = true;
+                        } else {
+                            // المحاضرة أُقيمت وتم التحضير فيها
+                            if (unexcusedAbs >= expectedHours) {
+                                confirmedFullAbsenceInAnyCrn = true; // غاب عن هذا المقرر بالكامل
+                            } else if (unexcusedAbs > 0) {
+                                confirmedPresence = true; // غاب جزء وحضر جزء (إذن هو موجود بالكلية!)
                             } else {
-                                partiallyAbsentCrnsCount++; // غاب جزءاً من المقرر فقط
-                                // إذا كان هناك جزء لم يُغطَّ في تحضير المدرب، نعتبره مجهولاً أيضاً
-                                if (taughtHours < expectedHours) {
-                                    unknownCrnsCount++;
-                                }
+                                confirmedPresence = true; // لم يغب (إذن هو موجود بالكلية!)
                             }
-                        } else if (canceledAbs > 0) {
-                            unknownCrnsCount++; // جلسة ملغاة = مجهول الحضور
-                        } else if (taughtHours === 0 && expectedHours > 0) {
-                            unknownCrnsCount++; // المدرب لم يُحضر أبداً = مجهول
-                        } else if (taughtHours > 0 && taughtHours < expectedHours) {
-                            presentCrnsCount++; // حضر الجزء الذي تم تحضيره
-                            unknownCrnsCount++; // والجزء الآخر مجهول لأن المدرب لم يُحضره
-                        } else if (taughtHours >= expectedHours && expectedHours > 0) {
-                            presentCrnsCount++; // حضر جميع اللقاءات
                         }
                     }
                 });
 
-                // شجرة اتخاذ القرار الدقيقة (حسب القاعدة الذهبية: أي مجهول مع غياب = محتمل)
-                if (expectedCrnsCount === 0) {
-                    t.weekStatuses[w] = "-"; // لا يوجد مقررات
-                } else if (unknownCrnsCount > 0 && (fullyAbsentCrnsCount > 0 || partiallyAbsentCrnsCount > 0)) {
-                    // لديه غياب (كلي أو جزئي) ولكن هناك مجهول (مقرر لم يُحضر أو لقاء آخر بنفس المقرر)
-                    t.weekStatuses[w] = "محتمل";
-                    t.weeksAbsentCount++; // يُحسب كأسبوع غياب لوجود غياب فعلي
-                } else if (partiallyAbsentCrnsCount > 0) {
-                    // غياب جزئي مؤكد (لا يوجد مجهول)
-                    t.weekStatuses[w] = "جزئي";
-                    t.weeksAbsentCount++;
-                } else if (presentCrnsCount > 0 && fullyAbsentCrnsCount > 0) {
-                    // حضر مقرر بالكامل وغاب في آخر بالكامل (لا يوجد مجهول)
-                    t.weekStatuses[w] = "جزئي";
-                    t.weeksAbsentCount++;
-                } else if (fullyAbsentCrnsCount > 0 && unknownCrnsCount === 0 && presentCrnsCount === 0 && partiallyAbsentCrnsCount === 0) {
-                    // غاب في جميع الساعات المجدولة بشكل مؤكد (الغياب الكامل الحقيقي)
-                    t.weekStatuses[w] = "كامل";
-                    t.weeksAbsentCount++;
-                } else if (unknownCrnsCount > 0) {
-                    // لم يغب أبداً، ولكن توجد مقررات ملغاة أو مجهولة
-                    t.weekStatuses[w] = "محتمل";
-                } else if (fullyAbsentCrnsCount === 0 && partiallyAbsentCrnsCount === 0 && unknownCrnsCount === 0) {
-                    // حاضر بشكل مؤكد في كل شيء
-                    t.weekStatuses[w] = "-";
+                // شجرة اتخاذ القرار الذكية
+                if (totalActiveCrns === 0) {
+                    t.weekStatuses[w] = "-"; // لا يوجد جدول
+                } else if (confirmedPresence) {
+                    // إذا أثبت تواجده في الكلية بأي شكل
+                    if (hasAnyAbs) {
+                        t.weekStatuses[w] = "جزئي";
+                        t.weeksAbsentCount++;
+                    } else {
+                        t.weekStatuses[w] = "-";
+                    }
                 } else {
-                    t.weekStatuses[w] = "محتمل";
+                    // لم يثبت تواجده في الكلية (إما غاب عن كل شيء، أو كل شيء ملغي)
+                    if (confirmedFullAbsenceInAnyCrn) {
+                        if (unknownCrnCount > 0) {
+                            // غاب عن المقررات المتاحة، وهناك مقررات ملغاة/غير محضرة (غياب محتمل)
+                            t.weekStatuses[w] = "محتمل";
+                            t.weeksAbsentCount++; // يُحسب كغياب لأنه غاب فعلياً عن ما تم تحضيره
+                        } else {
+                            // غاب عن كل شيء بشكل مؤكد
+                            t.weekStatuses[w] = "كامل";
+                            t.weeksAbsentCount++;
+                        }
+                    } else {
+                        // لم يغب أبداً، ولكن لا يوجد ما يثبت تواجده (لأن المدربين لم يحضروا)
+                        // يُعطى المتدرب هنا حسن النية
+                        t.weekStatuses[w] = "-"; 
+                    }
                 }
-            }           
+            }
+           
            processedData.active.push(t);
         });
 
