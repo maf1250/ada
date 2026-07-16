@@ -267,6 +267,53 @@
 .variance-bad { background: var(--danger-subtle); color: var(--danger); }
 .variance-neutral { background: var(--bg-hover); color: var(--text-secondary); }
 
+        /* تثبيت أعمدة رقم المتدرب واسم المتدرب في الجداول ذات الصلة */
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table th:nth-child(1),
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table td:nth-child(1) {
+            position: sticky;
+            right: 0; /* التثبيت من اليمين */
+            min-width: 105px; /* تثبيت عرض رقم المتدرب لضبط المسافة */
+            max-width: 105px;
+            width: 105px;
+            background-color: var(--bg-surface);
+            z-index: 5; /* طبقة أعلى من الخلايا العادية */
+        }
+
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table th:nth-child(2),
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table td:nth-child(2) {
+            position: sticky;
+            right: 105px; /* يبدأ التثبيت بعد انتهاء عرض العمود الأول */
+            background-color: var(--bg-surface);
+            z-index: 5;
+            box-shadow: -3px 0 5px -1px rgba(0,0,0,0.08); /* ظل خفيف لإعطاء إيحاء بالعمق عند التمرير */
+        }
+
+        /* تعديل الظل ليتناسب مع الوضع الليلي */
+        [data-theme="dark"] :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table th:nth-child(2),
+        [data-theme="dark"] :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table td:nth-child(2) {
+            box-shadow: -4px 0 6px -2px rgba(0,0,0,0.4);
+        }
+
+        /* الحفاظ على العناوين في الأعلى وفوق الخلايا المثبتة أثناء التمرير للأسفل */
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table thead tr:nth-child(1) th:nth-child(1),
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table thead tr:nth-child(1) th:nth-child(2) {
+            z-index: 15;
+            background-color: var(--bg-elevated);
+        }
+
+        /* شريط التصفية (الفلاتر) وفوق الخلايا المثبتة */
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table thead tr:nth-child(2) th:nth-child(1),
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table thead tr:nth-child(2) th:nth-child(2) {
+            z-index: 14;
+            background-color: var(--bg-surface);
+        }
+
+        /* الحفاظ على تأثير اللون عند تمرير الماوس (Hover) فوق الصفوف */
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table tbody tr:hover td:nth-child(1),
+        :is(#table-main, #table-matrix, #table-percentages, #table-threatened, #table-fullweek, #table-deprived-all, #table-deprived-except, #table-excluded) table tbody tr:hover td:nth-child(2) {
+            background-color: var(--bg-hover);
+        }
+
         @media print {
             ._sidebar, ._header, ._filtersBar, ._uploadGrid, .info-card, .btn-action, .visitor-counter, .filter-row { display: none !important; }
             ._shell { display: block; height: auto; }
@@ -1275,7 +1322,7 @@ window.deleteCurrentTerm = async function() {
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
-          for(let w=1; w<=totalWeeks; w++) {
+      for(let w=1; w<=totalWeeks; w++) {
                 let absentCrnsCount = 0; let fullyAbsentCrnsCount = 0; let expectedCrnsCount = 0; let anyTrainerTaught = false; let anyCanceled = false;
                 activeCrns.forEach(crn => {
                     let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0; let scheduleHours = t.crns[crn].hours || 0;
@@ -1283,21 +1330,27 @@ window.deleteCurrentTerm = async function() {
                     let unexcusedAbs = wData ? wData.unexcusedAbs : 0; let canceledAbs = wData ? wData.canceledAbs : 0;
                     let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours; let expectedHours = Math.max(0, baseHours - canceledAbs);
 
-                    if (canceledAbs > 0) anyCanceled = true; 
+                    if (canceledAbs > 0) anyCanceled = true;
                     if (expectedHours > 0 || taughtHours > 0) expectedCrnsCount++; if (taughtHours > 0) anyTrainerTaught = true;
                     if (unexcusedAbs > 0) { absentCrnsCount++; if (expectedHours === 0 || unexcusedAbs >= expectedHours) fullyAbsentCrnsCount++; }
                 });
 
+                // الترتيب للأولويات
                 if (absentCrnsCount > 0) {
+                    // الأولوية الأولى: يوجد غياب صريح
                     if (fullyAbsentCrnsCount > 0 && fullyAbsentCrnsCount === expectedCrnsCount) { t.weekStatuses[w] = "كامل"; t.weeksAbsentCount++; }
                     else { t.weekStatuses[w] = "جزئي"; t.weeksAbsentCount++; }
+                } else if (anyTrainerTaught) {
+                    // الأولوية الثانية: حضر في مقرر واحد على الأقل (ولم يغب في البقية)
+                    t.weekStatuses[w] = "-"; 
                 } else if (anyCanceled) { 
+                    // الأولوية الثالثة: لم يغب، ولم يسجل له حضور، ولكن توجد جلسة ملغاة
                     t.weekStatuses[w] = "محتمل"; 
                 } else if (expectedCrnsCount === 0) {
-                    t.weekStatuses[w] = "-"; // لا توجد مقررات مجدولة في هذا الأسبوع (إجازة مثلاً)
-                } else if (anyTrainerTaught) {
-                    t.weekStatuses[w] = "-"; // تم التحضير ولم يسجل غياب
+                    // الأولوية الرابعة: أسبوع إجازة (لا توجد ساعات متوقعة)
+                    t.weekStatuses[w] = "-"; 
                 } else {
+                    // الأولوية الخامسة: فجوة تحضير (المدربون لم يحضروا ولم يتم الإلغاء)
                     t.weekStatuses[w] = "محتمل"; 
                 }
             }
