@@ -1322,9 +1322,10 @@ window.deleteCurrentTerm = async function() {
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
-   for(let w=1; w<=totalWeeks; w++) {
+ for(let w=1; w<=totalWeeks; w++) {
                 let expectedCrnsCount = 0;
-                let absentCrnsCount = 0;
+                let fullyAbsentCrnsCount = 0; // غاب المقرر بالكامل (كل اللقاءات)
+                let partiallyAbsentCrnsCount = 0; // غاب لقاء وحضر لقاء في نفس المقرر
                 let presentCrnsCount = 0;
                 let unknownCrnsCount = 0;
 
@@ -1342,40 +1343,51 @@ window.deleteCurrentTerm = async function() {
                         expectedCrnsCount++;
 
                         if (unexcusedAbs > 0) {
-                            absentCrnsCount++; // سجل غياب
+                            // هنا التعديل الجوهري لحساب اللقاءات المتعددة
+                            if (expectedHours > 0 && unexcusedAbs >= expectedHours) {
+                                fullyAbsentCrnsCount++; // غاب عن جميع ساعات المقرر
+                            } else if (taughtHours > 0 && unexcusedAbs >= taughtHours) {
+                                fullyAbsentCrnsCount++; // غاب عن كل ما تم تدريسه فعلياً
+                            } else {
+                                partiallyAbsentCrnsCount++; // غاب لقاء وحضر لقاء آخر في نفس المقرر!
+                            }
                         } else if (canceledAbs > 0) {
                             unknownCrnsCount++; // مسجل كجلسة ملغاة (مجهول)
                         } else if (taughtHours === 0 && expectedHours > 0) {
                             unknownCrnsCount++; // لم يقم المدرب بالتحضير (مجهول)
                         } else if (taughtHours > 0 && unexcusedAbs === 0) {
-                            presentCrnsCount++; // حاضر بشكل مؤكد
+                            presentCrnsCount++; // حاضر جميع لقاءات المقرر
                         }
                     }
                 });
 
-                // شجرة اتخاذ القرار الدقيقة الجديدة بناءً على الفئات
+                // شجرة اتخاذ القرار الدقيقة (محدثة لدعم الغياب الجزئي داخل المقرر الواحد)
                 if (expectedCrnsCount === 0) {
-                    t.weekStatuses[w] = "-"; // إجازة أو لا يوجد مقررات مجدولة
-                } else if (presentCrnsCount > 0 && absentCrnsCount > 0) {
-                    // حضر بعض المقررات وغاب في أخرى (مؤكد 100% أنه جزئي بغض النظر عن المقررات المجهولة)
+                    t.weekStatuses[w] = "-"; // إجازة أو لا يوجد مقررات
+                } else if (partiallyAbsentCrnsCount > 0) {
+                    // بمجرد أن المتدرب غاب جزء وحضر جزء في أي مقرر، فالأسبوع بأكمله يعتبر جزئي يقيناً
                     t.weekStatuses[w] = "جزئي";
                     t.weeksAbsentCount++;
-                } else if (absentCrnsCount > 0 && unknownCrnsCount > 0) {
-                    // غاب في مقرر، والمقرر الآخر ملغى أو لم يُحضر (وهذا هو مثالك بالضبط)
+                } else if (presentCrnsCount > 0 && fullyAbsentCrnsCount > 0) {
+                    // حضر مقرر بالكامل وغاب في آخر بالكامل
+                    t.weekStatuses[w] = "جزئي";
+                    t.weeksAbsentCount++;
+                } else if (fullyAbsentCrnsCount > 0 && unknownCrnsCount > 0) {
+                    // غاب مقرر بالكامل، والمقرر الآخر ملغى أو مجهول
                     t.weekStatuses[w] = "محتمل";
-                    t.weeksAbsentCount++; // يُحسب له أسبوع غياب لأن لديه غياب فعلي مؤكد في النظام
-                } else if (absentCrnsCount > 0 && unknownCrnsCount === 0) {
-                    // غاب في جميع المقررات المجدولة بشكل مؤكد
+                    t.weeksAbsentCount++; // يُحسب كأسبوع غياب لوجود غياب فعلي
+                } else if (fullyAbsentCrnsCount > 0 && unknownCrnsCount === 0 && presentCrnsCount === 0) {
+                    // غاب في جميع اللقاءات المجدولة لجميع المقررات
                     t.weekStatuses[w] = "كامل";
                     t.weeksAbsentCount++;
-                } else if (absentCrnsCount === 0 && unknownCrnsCount > 0) {
-                    // لم يغب أبداً، ولكن توجد مقررات ملغاة أو لم تُحضر (لا نعلم هل حضرها أم لا)
+                } else if (fullyAbsentCrnsCount === 0 && partiallyAbsentCrnsCount === 0 && unknownCrnsCount > 0) {
+                    // لم يغب أبداً، ولكن توجد مقررات ملغاة أو لم تُحضر
                     t.weekStatuses[w] = "محتمل";
-                } else if (absentCrnsCount === 0 && unknownCrnsCount === 0) {
-                    // حاضر في جميع المقررات بشكل مؤكد
+                } else if (fullyAbsentCrnsCount === 0 && partiallyAbsentCrnsCount === 0 && unknownCrnsCount === 0) {
+                    // حاضر بشكل مؤكد في كل شيء
                     t.weekStatuses[w] = "-";
                 } else {
-                    t.weekStatuses[w] = "محتمل"; // حالة احتياطية
+                    t.weekStatuses[w] = "محتمل";
                 }
             }
            
