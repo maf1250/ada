@@ -1275,26 +1275,33 @@ window.deleteCurrentTerm = async function() {
             t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
-            for(let w=1; w<=totalWeeks; w++) {
-                let absentCrnsCount = 0; let fullyAbsentCrnsCount = 0; let expectedCrnsCount = 0; let anyTrainerTaught = false;
+          for(let w=1; w<=totalWeeks; w++) {
+                let absentCrnsCount = 0; let fullyAbsentCrnsCount = 0; let expectedCrnsCount = 0; let anyTrainerTaught = false; let anyCanceled = false;
                 activeCrns.forEach(crn => {
                     let taughtHours = (TTH[w] && TTH[w][crn]) ? TTH[w][crn] : 0; let scheduleHours = t.crns[crn].hours || 0;
                     let wData = t.weeklyCrnAbsences[w] && t.weeklyCrnAbsences[w][crn];
                     let unexcusedAbs = wData ? wData.unexcusedAbs : 0; let canceledAbs = wData ? wData.canceledAbs : 0;
                     let baseHours = scheduleHours > 0 ? scheduleHours : taughtHours; let expectedHours = Math.max(0, baseHours - canceledAbs);
 
+                    if (canceledAbs > 0) anyCanceled = true; 
                     if (expectedHours > 0 || taughtHours > 0) expectedCrnsCount++; if (taughtHours > 0) anyTrainerTaught = true;
                     if (unexcusedAbs > 0) { absentCrnsCount++; if (expectedHours === 0 || unexcusedAbs >= expectedHours) fullyAbsentCrnsCount++; }
                 });
 
-                if (expectedCrnsCount === 0) t.weekStatuses[w] = "-";
-                else if (absentCrnsCount > 0) {
+                if (absentCrnsCount > 0) {
                     if (fullyAbsentCrnsCount > 0 && fullyAbsentCrnsCount === expectedCrnsCount) { t.weekStatuses[w] = "كامل"; t.weeksAbsentCount++; }
                     else { t.weekStatuses[w] = "جزئي"; t.weeksAbsentCount++; }
-                } else if (anyTrainerTaught) t.weekStatuses[w] = "-"; 
-                else t.weekStatuses[w] = "محتمل";
+                } else if (anyCanceled) { 
+                    t.weekStatuses[w] = "محتمل"; 
+                } else if (expectedCrnsCount === 0) {
+                    t.weekStatuses[w] = "-"; // لا توجد مقررات مجدولة في هذا الأسبوع (إجازة مثلاً)
+                } else if (anyTrainerTaught) {
+                    t.weekStatuses[w] = "-"; // تم التحضير ولم يسجل غياب
+                } else {
+                    t.weekStatuses[w] = "محتمل"; 
+                }
             }
-            processedData.active.push(t);
+           processedData.active.push(t);
         });
 
         // ------------------ بناء بيانات المدربين والشعب ------------------
