@@ -1307,7 +1307,6 @@ window.filterTables = function() {
             let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي'); 
             let isCoop = courseName && (courseName.includes('التدريب التعاوني') || courseName.includes('التدريب الميداني'));
             
-            // السطرين اللذين تسببا في الخطأ بسبب نسيانهما في التعديل السابق:
             let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
             let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
 
@@ -1336,9 +1335,6 @@ window.filterTables = function() {
                 }
             }
         
-            let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
-            let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
-
             if(crn && courseCode && !isCourseExcluded) {
                 traineesMap[id].courseCodes.add(courseCode);
                 if (!traineesMap[id].crns[crn]) {
