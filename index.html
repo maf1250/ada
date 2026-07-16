@@ -1302,35 +1302,40 @@ window.filterTables = function() {
             } else if (regStatus.includes('انسحاب') || regStatus.includes('مطوي')) {
                 traineesMap[id].regStatus = regStatus; 
             }
-            
+
             let crn = row['الرقم المرجعي']; let courseCode = row['المقرر']; let courseName = row['اسم المقرر'] || row['عنوان المقرر'];
             let isCourseExcluded = regStatus.includes('انسحاب') || regStatus.includes('مطوي'); 
             let isCoop = courseName && (courseName.includes('التدريب التعاوني') || courseName.includes('التدريب الميداني'));
+            
+            // السطرين اللذين تسببا في الخطأ بسبب نسيانهما في التعديل السابق:
+            let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
+            let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
 
-if(crn && courseCode && !isCourseExcluded) {
-    // لا نضيف التعاوني لعدد المقررات حتى لا يؤثر على فلتر "الحرمان بكل المقررات"
-    if (!isCoop) traineesMap[id].courseCodes.add(courseCode); 
-    
-    if (!traineesMap[id].crns[crn]) {
-        let ch = courseHours[crn] || 0;
-        traineesMap[id].crns[crn] = { code: courseCode, name: courseName, hours: ch, absHours: 0, isOfficiallyDeprived: isDeprived, regStatus: regStatus, isLifted: isLifted, isCoop: isCoop };
-    } else {
-        if (isDeprived) traineesMap[id].crns[crn].isOfficiallyDeprived = true;
-        if (isLifted) {
-            traineesMap[id].crns[crn].isLifted = true;
-            traineesMap[id].crns[crn].isOfficiallyDeprived = false;
-        }
-        traineesMap[id].crns[crn].regStatus = regStatus;
-        traineesMap[id].crns[crn].isCoop = isCoop;
-    }
-    
-    // استبعاد التعاوني من إحصائيات المدربين والشعب
-    if(crnMap[crn] && !isCoop) {
-        crnMap[crn].enrolled++;
-        if(isDeprived) crnMap[crn].deprived++;
-        if(isLifted) crnMap[crn].liftedCount = (crnMap[crn].liftedCount || 0) + 1;
-    }
-}
+            if(crn && courseCode && !isCourseExcluded) {
+                // لا نضيف التعاوني لعدد المقررات حتى لا يؤثر على فلتر "الحرمان بكل المقررات"
+                if (!isCoop) traineesMap[id].courseCodes.add(courseCode); 
+                
+                if (!traineesMap[id].crns[crn]) {
+                    let ch = courseHours[crn] || 0;
+                    traineesMap[id].crns[crn] = { code: courseCode, name: courseName, hours: ch, absHours: 0, isOfficiallyDeprived: isDeprived, regStatus: regStatus, isLifted: isLifted, isCoop: isCoop };
+                } else {
+                    if (isDeprived) traineesMap[id].crns[crn].isOfficiallyDeprived = true;
+                    if (isLifted) {
+                        traineesMap[id].crns[crn].isLifted = true;
+                        traineesMap[id].crns[crn].isOfficiallyDeprived = false;
+                    }
+                    traineesMap[id].crns[crn].regStatus = regStatus;
+                    traineesMap[id].crns[crn].isCoop = isCoop;
+                }
+                
+                // استبعاد التعاوني من إحصائيات المدربين والشعب
+                if(crnMap[crn] && !isCoop) {
+                    crnMap[crn].enrolled++;
+                    if(isDeprived) crnMap[crn].deprived++;
+                    if(isLifted) crnMap[crn].liftedCount = (crnMap[crn].liftedCount || 0) + 1;
+                }
+            }
+        
             let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
             let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
 
