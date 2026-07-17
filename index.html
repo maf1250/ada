@@ -2075,6 +2075,11 @@ Object.values(t.crns).forEach(c => {
     window.saveWaTemplate = function() { localStorage.setItem(isFemale ? 'wa_template_f' : 'wa_template_m', document.getElementById('waTemplateInput').value); closeWaModal(); window.renderTables(parseInt(document.getElementById('totalWeeks').value) || 18); };
     window.insertWaVar = function(v) { let input = document.getElementById('waTemplateInput'); let start = input.selectionStart; let end = input.selectionEnd; input.value = input.value.substring(0, start) + v + input.value.substring(end); input.focus(); input.selectionStart = input.selectionEnd = start + v.length; };
 
+        window.addEventListener('click', function(event) {
+        if (event.target.classList.contains('modal-overlay')) {
+            event.target.classList.remove('active');
+        }
+    });
     window.addEventListener('DOMContentLoaded', async () => {
         let settings = JSON.parse(localStorage.getItem('abs_reports_settings'));
         if (settings) { document.getElementById('totalWeeks').value = settings.weeks || 18; window.savedFilters = settings; }
