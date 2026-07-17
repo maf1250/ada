@@ -1367,7 +1367,7 @@ window.filterTables = function() {
             if(major) majorsSet.add(major.trim()); if(traineeStatus) statusesSet.add(traineeStatus.trim());
 
            if(!traineesMap[id]) {
-                traineesMap[id] = { id: id, name: name, major: major, phone: row['رقم الجوال'], traineeStatus: traineeStatus, regStatus: regStatus, crns: {}, courseCodes: new Set(), weeklyCrnAbsences: {}, weekStatuses: {}, weeksAbsentCount: 0, totalUniqueCourses: 0, totalDeprivedCourses: 0 };
+                traineesMap[id] = { id: id, name: name, major: major, phone: row['رقم الجوال'], traineeStatus: traineeStatus, regStatus: regStatus, crns: {}, courseCodes: new Set(), allCourseCodes: new Set(), weeklyCrnAbsences: {}, weekStatuses: {}, weeksAbsentCount: 0, totalUniqueCourses: 0, totalDeprivedCourses: 0 };
             } else if (regStatus.includes('انسحاب') || regStatus.includes('مطوي')) {
                 traineesMap[id].regStatus = regStatus; 
             }
@@ -1379,7 +1379,8 @@ window.filterTables = function() {
             let isDeprived = (grade === 'ح' || regStatus.includes('حرمان بسبب غياب')); 
             let isLifted = regStatus.includes('معاد قيده لتعديل الحرمان') || regStatus.includes('تعديل الحرمان');
 
-            if(crn && courseCode && !isCourseExcluded) {
+           if(crn && courseCode && !isCourseExcluded) {
+                traineesMap[id].allCourseCodes.add(courseCode); // نضيفه هنا ليظهر رقمه في الجدول بشكل صحيح
                 // لا نضيف التعاوني لعدد المقررات حتى لا يؤثر على فلتر "الحرمان بكل المقررات"
                 if (!isCoop) traineesMap[id].courseCodes.add(courseCode); 
                 
@@ -1514,7 +1515,7 @@ window.filterTables = function() {
                 }
             });
 
-            t.totalUniqueCourses = t.courseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
+            t.totalUniqueCourses = t.courseCodes.size; t.totalRegisteredCourses = t.allCourseCodes.size; t.totalDeprivedCourses = t.deprivedCourseCodes.size; t.weeksAbsentCount = 0;
             let activeCrns = Object.keys(t.crns);
 
 
@@ -1947,7 +1948,7 @@ window.filterTables = function() {
         let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
         let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
         if(!isExcluded) {
-            html += `<td class="text-center">${t.totalUniqueCourses || 0}</td><td class="text-center"><span class="badge ${t.totalDeprivedCourses > 0 ? 'badge-danger' : 'badge-success'}">${t.totalDeprivedCourses || 0}</span></td><td class="text-center">${t.weeksAbsentCount > 0 ? `<span class="badge badge-warning">${t.weeksAbsentCount}</span>` : '<span style="color:var(--text-muted); font-weight:bold;">-</span>'}</td>`;
+            html += `<td class="text-center">${t.totalRegisteredCourses || 0}</td><td class="text-center"><span class="badge ${t.totalDeprivedCourses > 0 ? 'badge-danger' : 'badge-success'}">${t.totalDeprivedCourses || 0}</span></td><td class="text-center">${t.weeksAbsentCount > 0 ? `<span class="badge badge-warning">${t.weeksAbsentCount}</span>` : '<span style="color:var(--text-muted); font-weight:bold;">-</span>'}</td>`;
             for(let w=1; w<=totalWeeks; w++) { let st = t.weekStatuses ? t.weekStatuses[w] : null; let badge = ''; if(st === 'كامل') badge = '<span class="badge badge-danger">كامل</span>'; else if(st === 'محتمل') badge = '<span class="badge badge-info">محتمل</span>'; else if(st === 'جزئي') badge = '<span class="badge badge-warning">جزئي</span>'; else badge = '<span style="color:var(--text-muted); font-weight:bold;">-</span>'; html += `<td class="text-center">${badge}</td>`; }
         } else { html += `<td>${t.regStatus || '-'}</td><td>${t.traineeStatus || '-'}</td>`; }
         html += `</tr>`; return html;
