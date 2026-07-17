@@ -928,7 +928,7 @@ window.renderFileDate = function(type, fDate) {
         let dateEl = document.getElementById(`date-${type}`);
         if(!dateEl) return;
         
-        // استخراج الفصل التدريبي من البيانات لمعرفته
+        // استخراج الفصل التدريبي من البيانات
         let terms = new Set();
         if(rawData && rawData[type] && rawData[type].length > 0) {
             rawData[type].forEach(row => {
@@ -938,12 +938,46 @@ window.renderFileDate = function(type, fDate) {
                 }
             });
         }
-        let termStr = Array.from(terms).join(' + ');
+        let currentTerms = Array.from(terms);
+        let termStr = currentTerms.join(' + ');
         if(termStr === "") termStr = "غير محدد";
         
-        // تنسيق تنبيه بصري إذا كان الملف مدمجاً بأكثر من فصل
-        let termColor = terms.size > 1 ? 'var(--danger)' : 'var(--primary)';
-        let termWarning = terms.size > 1 ? '<br><span style="color:var(--danger); font-size:10.5px;">(تنبيه: الملف يحتوي على بيانات مدمجة لعدة فصول)</span>' : '';
+        let hasMultipleTerms = currentTerms.length > 1;
+        let isMismatch = false;
+
+        // التحقق من المطابقة بين SF01 و SO04 فقط 
+        // (تم تجاهل SS01 لأن صيغته مختلفة ولا توجد به حروف)
+        if (type === 'sf01' || type === 'so04') {
+            let otherType = type === 'sf01' ? 'so04' : 'sf01';
+            let otherTerms = new Set();
+            if(rawData && rawData[otherType] && rawData[otherType].length > 0) {
+                rawData[otherType].forEach(row => {
+                    let term = row['الفصل التدريبي'] || row['الفصل'];
+                    if(term && term.toString().trim() !== "") {
+                        otherTerms.add(term.toString().trim());
+                    }
+                });
+            }
+            let otherTermsArray = Array.from(otherTerms);
+            
+            // إذا كان الملف الآخر مرفوعاً، نقارن الفصل الأول من كلاهما
+            if (otherTermsArray.length > 0 && currentTerms.length > 0) {
+                if (currentTerms[0] !== otherTermsArray[0]) {
+                    isMismatch = true;
+                }
+            }
+        }
+        
+        // تحديد الألوان والتنبيهات
+        let termColor = (hasMultipleTerms || isMismatch) ? 'var(--danger)' : 'var(--primary)';
+        let termWarning = '';
+        
+        if (hasMultipleTerms) {
+            termWarning = '<br><span style="color:var(--danger); font-size:10.5px;">(تنبيه: الملف يحتوي على بيانات مدمجة لعدة فصول)</span>';
+        } else if (isMismatch) {
+            let otherName = type === 'sf01' ? 'تقرير الغياب SO04' : 'قائمة المتدربين SF01';
+            termWarning = `<br><span style="color:var(--danger); font-size:10.5px;">(تنبيه: الفصل لا يتطابق مع ${otherName})</span>`;
+        }
 
         let now = new Date();
         let diffMs = Math.abs(now - fDate);
@@ -979,6 +1013,12 @@ window.renderFileDate = function(type, fDate) {
             if(type === 'ss01') pEl.innerText = "جداول الوحدة التدريبية";
             if(type === 'so04') pEl.innerText = "التقرير التاريخي للغياب";
             let dateEl = document.getElementById(`date-${type}`); if(dateEl) dateEl.innerHTML = '';
+            
+            // تحديث العرض للملفات المتبقية لإزالة اللون الأحمر في حال زال التعارض
+            if(fileDates.sf01) renderFileDate('sf01', new Date(fileDates.sf01)); 
+            if(fileDates.ss01) renderFileDate('ss01', new Date(fileDates.ss01)); 
+            if(fileDates.so04) renderFileDate('so04', new Date(fileDates.so04)); 
+
             await saveDataLocally(); processData();
         }
     };
@@ -996,8 +1036,10 @@ window.renderFileDate = function(type, fDate) {
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             rawData[type] = XLSX.utils.sheet_to_json(firstSheet, {defval: ""});
             
-            // تم نقل دالة العرض هنا لكي تقرأ الفصل التدريبي بعد تفريغ الإكسل
-            renderFileDate(type, fDate); 
+            // تحديث العرض للملفات المرفوعة لتطبيق اللون الأحمر إذا وُجد تعارض
+            if(fileDates.sf01) renderFileDate('sf01', new Date(fileDates.sf01)); 
+            if(fileDates.ss01) renderFileDate('ss01', new Date(fileDates.ss01)); 
+            if(fileDates.so04) renderFileDate('so04', new Date(fileDates.so04)); 
             
             await saveDataLocally(); window.processData();
         };
