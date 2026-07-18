@@ -752,6 +752,7 @@
     var termsList = ["الفصل الحالي"];
     var rawData = { sf01: [], ss01: [], so04: [] };
     var fileDates = { sf01: null, ss01: null, so04: null };
+    var fileNames = { sf01: null, ss01: null, so04: null }; 
     var processedData = { active: [], excluded: [], percentages: [], instructors: [], sections: [] };
     var TTH = {}; var courseHours = {}; var isFemale = false; 
     var globalExcuseStats = { unexcused: 0, excused: 0, canceled: 0 };
@@ -760,7 +761,7 @@
     async function saveDataLocally() {
         try {
             // دمج البيانات مع التواريخ في حزمة واحدة لكل فصل
-            let termPackage = { data: rawData, dates: fileDates };
+            let termPackage = { data: rawData, dates: fileDates, names: fileNames };
             await saveToDB('term_' + activeTermName, termPackage);
             localStorage.setItem('abs_terms_list', JSON.stringify(termsList));
             localStorage.setItem('abs_active_term', activeTermName);
@@ -787,6 +788,7 @@
             // تصفير البيانات للفصل الجديد
             rawData = { sf01: [], ss01: [], so04: [] };
             fileDates = { sf01: null, ss01: null, so04: null };
+            fileNames = { sf01: null, ss01: null, so04: null };
             
             // تصفير واجهة الرفع
             ['sf01', 'ss01', 'so04'].forEach(t => {
@@ -806,25 +808,33 @@
         activeTermName = selectedTerm;
         localStorage.setItem('abs_active_term', activeTermName);
         
-        let dbData = await loadFromDB('term_' + activeTermName);
+      let dbData = await loadFromDB('term_' + activeTermName);
         if(dbData) {
             rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
             fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+            fileNames = dbData.names || { sf01: null, ss01: null, so04: null };
         } else {
             rawData = { sf01: [], ss01: [], so04: [] };
             fileDates = { sf01: null, ss01: null, so04: null };
+            fileNames = { sf01: null, ss01: null, so04: null };
         }
 
-        // تحديث واجهة الرفع
+     // تحديث واجهة الرفع
+        let defaultTitles = {
+            'sf01': 'قائمة المتدربين المسجلين',
+            'ss01': 'جداول الوحدة التدريبية',
+            'so04': 'التقرير التاريخي للغياب'
+        };
+
         ['sf01', 'ss01', 'so04'].forEach(type => {
             let dropz = document.getElementById(`drop-${type}`);
             if(rawData[type] && rawData[type].length > 0) {
                 dropz.classList.add('has-file');
-                dropz.querySelector('p').innerText = "تم استرجاع الملف من الأرشيف";
-                if(fileDates[type]) renderFileDate(type, new Date(fileDates[type]));
+                // عرض اسم الملف إن وُجد، وإلا يعرض الوصف الأصلي
+                dropz.querySelector('p').innerText = fileNames[type] || defaultTitles[type];
             } else {
                 dropz.classList.remove('has-file');
-                dropz.querySelector('p').innerText = type === 'sf01' ? "قائمة المتدربين" : (type === 'ss01' ? "جداول الوحدة" : "تقرير الغياب");
+                dropz.querySelector('p').innerText = defaultTitles[type];
                 let dateEl = document.getElementById(`date-${type}`); if(dateEl) dateEl.innerHTML = '';
             }
         });
@@ -1019,7 +1029,7 @@ window.renderFileDate = function(type, fDate) {
 
     window.deleteReport = async function(type) {
         if(confirm("سيتم حذف هذا التقرير")) {
-            rawData[type] = []; fileDates[type] = null;
+            rawData[type] = []; fileDates[type] = null; fileNames[type] = null;
             let dropZone = document.getElementById(`drop-${type}`); dropZone.classList.remove('has-file');
             let pEl = dropZone.querySelector('p');
             if(type === 'sf01') pEl.innerText = "قائمة المتدربين المسجلين";
@@ -1040,7 +1050,7 @@ window.renderFileDate = function(type, fDate) {
         const file = e.target.files[0]; if (!file) return;
         let dropZone = document.getElementById(`drop-${type}`); dropZone.classList.add('has-file');
         let pEl = dropZone.querySelector('p'); pEl.innerText = file.name;
-        let fDate = new Date(file.lastModified); fileDates[type] = fDate.getTime(); 
+        let fDate = new Date(file.lastModified); fileDates[type] = fDate.getTime(); fileNames[type] = file.name; 
 
         const reader = new FileReader();
         reader.onload = async function(evt) {
@@ -2118,18 +2128,28 @@ Object.values(t.crns).forEach(c => {
             }
         }
 
-        if (dbData) {
-            try {
-                rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
-                fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
-                
-                Object.keys(fileDates).forEach(type => { 
-                    if (fileDates[type] && rawData[type] && rawData[type].length > 0) { 
-                        renderFileDate(type, new Date(fileDates[type])); 
-                        let dropz = document.getElementById(`drop-${type}`); 
-                        if(dropz) { dropz.classList.add('has-file'); dropz.querySelector('p').innerText = "تم استرجاع الملف من التخزين"; } 
-                    } 
-                });
+    if (dbData) {
+                try {
+                    rawData = dbData.data || { sf01: [], ss01: [], so04: [] };
+                    fileDates = dbData.dates || { sf01: null, ss01: null, so04: null };
+                    fileNames = dbData.names || { sf01: null, ss01: null, so04: null };
+                    
+                let defaultTitles = {
+                        'sf01': 'قائمة المتدربين المسجلين',
+                        'ss01': 'جداول الوحدة التدريبية',
+                        'so04': 'التقرير التاريخي للغياب'
+                    };
+                    
+                    Object.keys(fileDates).forEach(type => { 
+                        if (fileDates[type] && rawData[type] && rawData[type].length > 0) { 
+                            renderFileDate(type, new Date(fileDates[type])); 
+                            let dropz = document.getElementById(`drop-${type}`); 
+                            if(dropz) { 
+                                dropz.classList.add('has-file'); 
+                                dropz.querySelector('p').innerText = fileNames[type] || defaultTitles[type]; 
+                            } 
+                        } 
+                    });
                 
                 if (rawData.sf01?.length > 0 && rawData.ss01?.length > 0 && rawData.so04?.length > 0) { 
                     processData(); switchTab('report-dashboard', document.getElementById('nav-dashboard')); 
