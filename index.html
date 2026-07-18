@@ -520,7 +520,7 @@
                             <div id="legend-prob">تعني أن المتدرب غاب عن المقررات التي تم التحضير فيها، ولكن توجد مقررات أخرى له في نفس الأسبوع لم يقم مدربوها برصد الحضور (أو تم إلغاؤها)، لذا لا يمكن الجزم بغيابه لكامل الأسبوع.</div>
                         </li>
                         <li>
-                            <div class="info-badge-wrapper"><span style="color:var(--text-muted); font-weight:bold; font-size: 16px;">-</span></div>
+                            <div class="info-badge-wrapper"><span class="badge badge-success">منتظم</span></div>
                             <div id="legend-present">تعني أن سجل المتدرب خالٍ من الغياب في هذا الأسبوع (إما لانتظامه وإثبات حضوره، أو لعدم رصد أي بيانات غياب من قِبل المدربين).</div>
                         </li>
                         <hr style="border: 0; border-top: 1px dashed var(--border); width: 100%; margin: 8px 0;">
@@ -1578,36 +1578,30 @@ window.filterTables = function() {
                     }
                 });
 
-                // شجرة اتخاذ القرار الذكية
+            // شجرة اتخاذ القرار الذكية
                 if (totalActiveCrns === 0) {
-                    t.weekStatuses[w] = "-"; // لا يوجد جدول
+                    t.weekStatuses[w] = "-"; // لا يوجد جدول فعلي
                 } else if (confirmedPresence) {
-                    // إذا أثبت تواجده في الكلية بأي شكل
                     if (hasAnyAbs) {
                         t.weekStatuses[w] = "جزئي";
                         t.weeksAbsentCount++;
                     } else {
-                        t.weekStatuses[w] = "-";
+                        t.weekStatuses[w] = "منتظم";
                     }
                 } else {
-                    // لم يثبت تواجده في الكلية (إما غاب عن كل شيء، أو كل شيء ملغي)
                     if (confirmedFullAbsenceInAnyCrn) {
                         if (unknownCrnCount > 0) {
-                            // غاب عن المقررات المتاحة، وهناك مقررات ملغاة/غير محضرة (غياب محتمل)
                             t.weekStatuses[w] = "محتمل";
-                            t.weeksAbsentCount++; // يُحسب كغياب لأنه غاب فعلياً عن ما تم تحضيره
+                            t.weeksAbsentCount++; 
                         } else {
-                            // غاب عن كل شيء بشكل مؤكد
                             t.weekStatuses[w] = "كامل";
                             t.weeksAbsentCount++;
                         }
                     } else {
-                        // لم يغب أبداً، ولكن لا يوجد ما يثبت تواجده (لأن المدربين لم يحضروا)
-                        // يُعطى المتدرب هنا حسن النية
-                        t.weekStatuses[w] = "-"; 
+                        t.weekStatuses[w] = "منتظم"; 
                     }
                 }
-            }
+           }
            
            processedData.active.push(t);
         });
@@ -1980,7 +1974,7 @@ const createRow = (t, isExcluded = false) => {
         let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}" data-fw="${fwStatus}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
         if(!isExcluded) {
             html += `<td class="text-center">${t.totalRegisteredCourses || 0}</td><td class="text-center"><span class="badge ${t.totalDeprivedCourses > 0 ? 'badge-danger' : 'badge-success'}">${t.totalDeprivedCourses || 0}</span></td><td class="text-center">${t.weeksAbsentCount > 0 ? `<span class="badge badge-warning">${t.weeksAbsentCount}</span>` : '<span style="color:var(--text-muted); font-weight:bold;">-</span>'}</td>`;
-            for(let w=1; w<=totalWeeks; w++) { let st = t.weekStatuses ? t.weekStatuses[w] : null; let badge = ''; if(st === 'كامل') badge = '<span class="badge badge-danger">كامل</span>'; else if(st === 'محتمل') badge = '<span class="badge badge-info">محتمل</span>'; else if(st === 'جزئي') badge = '<span class="badge badge-warning">جزئي</span>'; else badge = '<span style="color:var(--text-muted); font-weight:bold;">-</span>'; html += `<td class="text-center">${badge}</td>`; }
+            for(let w=1; w<=totalWeeks; w++) { let st = t.weekStatuses ? t.weekStatuses[w] : null; let badge = ''; if(st === 'كامل') badge = '<span class="badge badge-danger">كامل</span>'; else if(st === 'محتمل') badge = '<span class="badge badge-info">محتمل</span>'; else if(st === 'جزئي') badge = '<span class="badge badge-warning">جزئي</span>'; else if(st === 'منتظم') badge = '<span class="badge badge-success">منتظم</span>'; else badge = '<span style="color:var(--text-muted); font-weight:bold;">-</span>'; html += `<td class="text-center">${badge}</td>`; }
         } else { html += `<td>${t.regStatus || '-'}</td><td>${t.traineeStatus || '-'}</td>`; }
         html += `</tr>`; return html;
     };
