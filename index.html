@@ -474,6 +474,11 @@
                 <option value="">الجميع (غياب وانتظام)</option>
                 <option value="absent">التركيز على الغياب فقط</option>
             </select>
+           <select id="filterFullWeekType" class="input-select" style="display: none;" onchange="filterTables(); saveSettingsLocally();">
+                <option value="">نوع الانقطاع: الكل</option>
+                <option value="كامل">غياب كامل (مؤكد)</option>
+                <option value="محتمل">غياب محتمل (لم يُحضر)</option>
+            </select>
         </div>
 
         <div class="_content">
@@ -879,7 +884,8 @@ function saveSettingsLocally() {
             major: document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : '',
             status: document.getElementById('filterStatus') ? document.getElementById('filterStatus').value : '',
             absence: document.getElementById('filterAbsence') ? document.getElementById('filterAbsence').value : '',
-            search: document.getElementById('searchInput') ? document.getElementById('searchInput').value : ''
+            search: document.getElementById('searchInput') ? document.getElementById('searchInput').value : '',
+            fwType: document.getElementById('filterFullWeekType') ? document.getElementById('filterFullWeekType').value : ''
         };
         localStorage.setItem('abs_reports_settings', JSON.stringify(settings));
     }
@@ -910,10 +916,17 @@ window.switchTab = function(tabId, el, titleOverride) {
                     
                     // إخفاء القوائم المنسدلة فقط في صفحة المدربين والشعب (وترك البحث)
                     let filterElements = filtersBar.querySelectorAll('select, span.filter-label');
-                    if (['report-instructors', 'report-sections'].includes(tabId)) {
+                  if (['report-instructors', 'report-sections'].includes(tabId)) {
                         filterElements.forEach(el => el.style.display = 'none');
                     } else {
-                        filterElements.forEach(el => el.style.display = '');
+                        filterElements.forEach(el => {
+                            if (el.id === 'filterFullWeekType') {
+                                // إظهار فلتر نوع الانقطاع فقط في صفحة الانقطاع
+                                el.style.display = (tabId === 'report-fullweek') ? '' : 'none';
+                            } else {
+                                el.style.display = '';
+                            }
+                        });
                     }
                 }
             }
@@ -1137,6 +1150,7 @@ window.renderFileDate = function(type, fDate) {
     };
 
 window.filterTables = function() {
+        let fwTypeFilter = document.getElementById('filterFullWeekType') ? document.getElementById('filterFullWeekType').value : "";
         let input = document.getElementById('searchInput'); let globalTextFilter = input.value.trim().toLowerCase();
         let cohortFilter = document.getElementById('filterCohort') ? document.getElementById('filterCohort').value : "";
         let majorFilter = document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : "";
@@ -1173,12 +1187,18 @@ window.filterTables = function() {
                             matchCohort = idVal.startsWith(window.highestCohort.toString());
                         }
 
-                        let matchMajor = majorFilter === "" || (tr.hasAttribute('data-major') ? rowMajor === majorFilter : true);
+                     let matchMajor = majorFilter === "" || (tr.hasAttribute('data-major') ? rowMajor === majorFilter : true);
                         let matchStatus = statusFilter === "" || (tr.hasAttribute('data-status') ? rowStatus === statusFilter : true);
                         let matchAbsence = absenceFilter === "" || (absenceFilter === "absent" ? rowAbsent : true);
                         
+                        let rowFwStatus = tr.getAttribute('data-fw') || "";
+                        let matchFwType = true;
+                        if (tabId === 'table-fullweek' && fwTypeFilter !== "") {
+                            matchFwType = (rowFwStatus === fwTypeFilter);
+                        }
+
                         // تطبيق فلاتر التصفية السريعة فقط لجداول المتدربين
-                        show = show && matchMajor && matchStatus && matchAbsence && matchCohort;
+                        show = show && matchMajor && matchStatus && matchAbsence && matchCohort && matchFwType;
                     }
 
                     if (show && colFilters.length > 0) {
@@ -1943,10 +1963,21 @@ window.filterTables = function() {
         html += `</tr>${createFilterRow(numCols)}</thead>`; return html;
     };
 
-    const createRow = (t, isExcluded = false) => {
-        let totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18; let hasAbsence = t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0;
-        let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
-        let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
+const createRow = (t, isExcluded = false) => {
+        let totalWeeks = parseInt(document.getElementById('totalWeeks').value) || 18; 
+        let hasAbsence = t.weeksAbsentCount > 0 || t.totalDeprivedCourses > 0;
+        let safeStatus = t.traineeStatus ? t.traineeStatus.replace(/"/g, '&quot;') : ''; 
+        let safeMajor = t.major ? t.major.replace(/"/g, '&quot;') : '';
+        
+        // تحديد نوع الانقطاع للفلترة (أولوية للكامل ثم المحتمل)
+        let fwStatus = '';
+        if (t.weekStatuses) {
+            let statuses = Object.values(t.weekStatuses);
+            if (statuses.includes('كامل')) fwStatus = 'كامل';
+            else if (statuses.includes('محتمل')) fwStatus = 'محتمل';
+        }
+
+        let html = `<tr data-major="${safeMajor}" data-status="${safeStatus}" data-absent="${hasAbsence}" data-fw="${fwStatus}"><td class="mono">${t.id}</td><td class="name-cell"><a href="#" class="clickable-name" onclick="openTraineeProfile('${t.id}'); return false;">${t.name}</a></td><td>${t.major || '-'}</td>`;
         if(!isExcluded) {
             html += `<td class="text-center">${t.totalRegisteredCourses || 0}</td><td class="text-center"><span class="badge ${t.totalDeprivedCourses > 0 ? 'badge-danger' : 'badge-success'}">${t.totalDeprivedCourses || 0}</span></td><td class="text-center">${t.weeksAbsentCount > 0 ? `<span class="badge badge-warning">${t.weeksAbsentCount}</span>` : '<span style="color:var(--text-muted); font-weight:bold;">-</span>'}</td>`;
             for(let w=1; w<=totalWeeks; w++) { let st = t.weekStatuses ? t.weekStatuses[w] : null; let badge = ''; if(st === 'كامل') badge = '<span class="badge badge-danger">كامل</span>'; else if(st === 'محتمل') badge = '<span class="badge badge-info">محتمل</span>'; else if(st === 'جزئي') badge = '<span class="badge badge-warning">جزئي</span>'; else badge = '<span style="color:var(--text-muted); font-weight:bold;">-</span>'; html += `<td class="text-center">${badge}</td>`; }
@@ -2050,7 +2081,7 @@ Object.values(t.crns).forEach(c => {
         htmlThreatened += `</tbody></table>`; document.getElementById('table-threatened').innerHTML = htmlThreatened;
 
         if (window.savedFilters) {
-['filterCohort', 'filterMajor', 'filterStatus', 'filterAbsence', 'searchInput'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = window.savedFilters[id.replace('filter','').toLowerCase()] || ''; });
+['filterCohort', 'filterMajor', 'filterStatus', 'filterAbsence', 'filterFullWeekType', 'searchInput'].forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = window.savedFilters[id.replace('filter','').toLowerCase()] || ''; });
         }
         window.filterTables();
     };
